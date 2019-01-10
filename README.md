@@ -1,4 +1,4 @@
-## Delay Tolerant Networks in UNETSTACK
+# Delay Tolerant Networks in UNETSTACK
 ## Design Document
 *Arnav Dhamija, 2019*
 
@@ -24,4 +24,12 @@ We are relaxing some of the requirements for DTNs for the first iteration of thi
 * A storage mechanism to allow for SCAF.
 * A PDU (which will be wrapped in the DatagramReq) for storing DTN metadata such as TTL.
 * A DTNAgent which can handle Datagram requests from other agents and send essential notifications about the relay of PDUs. The DTNAgent should be able to talk over multiple ReliableLinks and should have a mechanism of choosing the best Link for a certain application.
-* 
+
+Goals which will not be covered by the first iteration but which may be covered in the future are:
+
+* Multihop routing of PDUs.
+* Dynamic routing protocols.
+* Fragmentation and reassembly of large PDUs.
+* Multiple copies of PDUs.
+* Ordering/prioritization of PDUs for relays between nodes.
+
