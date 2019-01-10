@@ -6,7 +6,7 @@
 
 ### Overview
 
-Delay Tolerant Networks (DTNs) are used in a number of applications where conventional communication schemes are inadequate due to erratic network conditions, lack of network infrastructure, or long propagation delays in the communication medium. Such networks are famously deployed for space probe communications through satellite relay networks.
+Delay Tolerant Networks (DTNs) are used in a number of applications where conventional communication schemes are inadequate due to erratic network conditions, lack of network infrastructure, or long propagation delays in the communication medium.
 
 In this project, we are attempting to use an adaptation of DTN protocols to improve message delivery in underwater networks using the UNETSTACK software platform. We are developing the protocol to target certain scenarios in which DTNs can have appreciable improvements in the network performance.
 
@@ -21,7 +21,7 @@ In this project, we are attempting to use an adaptation of DTN protocols to impr
 We are relaxing some of the requirements for DTNs for the first iteration of this project. Some of the current goals for the initial design include the implementation of:
 
 * Beacons to allow nodes to advertise their existence and find other nodes.
-* A storage mechanism to allow for SCAF.
+* A storage mechanism to allow for SCAF. This should also delete files which have been successfully acknowledged or those which have expired TTLs.
 * A PDU (which will be wrapped in the DatagramReq) for storing DTN metadata such as TTL.
 * A DTNAgent which can handle Datagram requests from other agents and send essential notifications about the relay of PDUs. The DTNAgent should be able to talk over multiple ReliableLinks and should have a mechanism of choosing the best Link for a certain application.
 
@@ -31,5 +31,8 @@ Goals which will not be covered by the first iteration but which may be covered 
 * Dynamic routing protocols.
 * Fragmentation and reassembly of large PDUs.
 * Multiple copies of PDUs.
-* Ordering/prioritization of PDUs for relays between nodes.
+* Optimally ordering/prioritizing PDUs for relays between nodes.
 
+### Flowchart
+
+![](UNETSTACK-DTN.png)
