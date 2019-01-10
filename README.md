@@ -90,4 +90,9 @@ class DtnPDU extends PDU {
 
 The DtnStorage class will handle the SCAF mechanism. It will track PDUs, manage storage on the node and will delete expired PDUs.
 
-Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having a map with the key being the PDU ID and the value being time of arrival of the PDU. This map must be maintained in a file.
+Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, Arrival Time, and TTL of the PDU. This database will be stored on the persistent storage.
+
+Alternatively, we can use a HashMap key-value pair, with the key being the PDU ID and the value being a Set of the Next Hop, Arrival Time, and TTL.
+
+The PDUs themselves will be serialized to JSON for storage on the Node using the [Gson](https://github.com/google/gson) library.
+
