@@ -41,16 +41,21 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 #### Beacon
 
-The Beacon is a part of the DTNAgent. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending a DatagramReq to the Broadcast address with the Recipient set to the DTNAgent.
+The Beacon is a part of the DTNAgent. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending a BeaconReq with the Recipient set to the DTNAgent.
 
 ```
 class DTNBeacon {
     int duration;
-    TickerBehaviour tb;
+    TickerBehavior tb;
+
     DTNBeacon(DTNAgent agent, int duration) {
-        tb = add new TickerBehaviour(agent, duration, {
-            send new DatagramReq(recipient: agent.getAgentID, to: Address.BROADCAST, ));
-        }))
+        tb = add new TickerBehavior(agent, duration, {
+            send new BeaconReq(recipient: agent.getAgentID(), channel: Physical.CONTROL));
+        }
+    }
+
+    void stopBroadcasting() {
+        tb.stop();
     }
 };
 ```
