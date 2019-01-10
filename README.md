@@ -39,7 +39,7 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 ### Classes
 
-#### Beacon
+#### DtnBeacon
 
 The Beacon is a part of the DTNAgent. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending a BeaconReq with the Recipient set to the DTNAgent.
 
@@ -66,19 +66,28 @@ class DtnBeacon {
 };
 ```
 
-#### PDU
+#### DtnPDU
 
 The PDU will hold the data to be transmitted along with the DTN metadata. For now, we just need to keep the TTL along with the data.
 
-Here, the TTL represents the number of seconds left before the PDU expires. 
+Here, the TTL represents the number of seconds left before the PDU expires. Once the PDU has expired, we delete it from persistent storage.
+
+The ID is a nonce for uniquely identifying each PDU for tracking purposes. It is generated on the node which creates the PDU.
 
 ```
 class DtnPDU extends PDU {
     void format() {
-        length(1024);
+        length(512);
+        uint32("id");
         uint32("ttl");
-        char("data", 1020);
+        char("data", 504);
         padding(0xff); // can be removed
     }
 };
+```
 
+#### DtnStorage
+
+The DtnStorage class will handle the SCAF mechanism. It will track PDUs, manage storage on the node and will delete expired PDUs.
+
+Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having a map with the key being the PDU ID and the value being time of arrival of the PDU. This map must be maintained in a file.
