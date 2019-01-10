@@ -94,5 +94,11 @@ Each PDU contains a TTL which specifies the time until its expiry. DtnStorage ca
 
 Alternatively, we can use a HashMap key-value pair, with the key being the PDU ID and the value being a Set of the Next Hop, Arrival Time, and TTL.
 
-The PDUs themselves will be serialized to JSON for storage on the Node using the [Gson](https://github.com/google/gson) library.
+The PDUs themselves will be serialized to JSON for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries.
 
+When the DtnAgent finds a new node, it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. If the PDU is still alive, the agent send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding JSON file is deleted along with it. If we don't receive a notification or 
+
+## Open Issues
+
+* Should no Ntf and failed Ntf be handled the same way?
+* How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
