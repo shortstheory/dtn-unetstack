@@ -43,12 +43,14 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 The Beacon is a part of the DTNAgent. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending a BeaconReq with the Recipient set to the DTNAgent.
 
+The BeaconReq should also some way of informing other nodes about which ReliableLinks are available on the node. Neighboring nodes can use this information to decide the best Link to send a DatagramReq on.
+
 ```
-class DTNBeacon {
+class DtnBeacon {
     int duration;
     TickerBehavior tb;
 
-    DTNBeacon(DTNAgent agent, int duration) {
+    DtnBeacon(DtnAgent agent, int duration) {
         tb = add new TickerBehavior(agent, duration, {
             send new BeaconReq(recipient: agent.getAgentID(), channel: Physical.CONTROL));
         }
@@ -57,5 +59,26 @@ class DTNBeacon {
     void stopBroadcasting() {
         tb.stop();
     }
+
+    // FIXME: Find a way to broadcast information about the ReliableLinks available on the node
+
+    // setters and getters for other things
 };
 ```
+
+#### PDU
+
+The PDU will hold the data to be transmitted along with the DTN metadata. For now, we just need to keep the TTL along with the data.
+
+Here, the TTL represents the number of seconds left before the PDU expires. 
+
+```
+class DtnPDU extends PDU {
+    void format() {
+        length(1024);
+        uint32("ttl");
+        char("data", 1020);
+        padding(0xff); // can be removed
+    }
+};
+
