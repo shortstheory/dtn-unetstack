@@ -2,7 +2,7 @@
 ## Design Document
 *Arnav Dhamija, 2019*
 
-**Everything here is Work In Progress!**
+**Everything in this DD is Work In Progress!**
 
 ### Overview
 
@@ -20,7 +20,7 @@ In this project, we are attempting to use an adaptation of DTN protocols to impr
 
 We are relaxing some of the requirements for DTNs for the first iteration of this project. Some of the current goals for the initial design include the implementation of:
 
-* Beacons to allow nodes to advertise their existence and find other nodes.
+* Beacons, to allow nodes to advertise their existence and find other nodes.
 * A storage mechanism to allow for SCAF. This should also delete files which have been successfully acknowledged or those which have expired TTLs.
 * A PDU (which will be wrapped in the DatagramReq) for storing DTN metadata such as TTL.
 * A DTNAgent which can handle Datagram requests from other agents and send essential notifications about the relay of PDUs. The DTNAgent should be able to talk over multiple ReliableLinks and should have a mechanism of choosing the best Link for a certain application.
@@ -36,3 +36,21 @@ Goals which will not be covered by the first iteration but which may be covered 
 ### Flowchart
 
 ![](UNETSTACK-DTN.png)
+
+### Classes
+
+#### Beacon
+
+The Beacon is a part of the DTNAgent. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending a DatagramReq to the Broadcast address with the Recipient set to the DTNAgent.
+
+```
+class DTNBeacon {
+    int duration;
+    TickerBehaviour tb;
+    DTNBeacon(DTNAgent agent, int duration) {
+        tb = add new TickerBehaviour(agent, duration, {
+            send new DatagramReq(recipient: agent.getAgentID, to: Address.BROADCAST, ));
+        }))
+    }
+};
+```
