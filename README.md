@@ -4,6 +4,8 @@
 
 **Everything in this DD is Work In Progress!**
 
+**Code snippets are just for illustration and are a mix of Java/Groovy with pseudocode**
+
 ### Overview
 
 Delay Tolerant Networks (DTNs) are used in a number of applications where conventional communication schemes are inadequate due to erratic network conditions, lack of network infrastructure, or long propagation delays in the communication medium.
@@ -126,8 +128,7 @@ class DtnStorage {
 
         for (var msg : messageSet) {
             if (msg.ttl + msg.arrivalTime > currentTime) {
-                delete(msg);
-                delete(PDU);
+                deleteMsg(msg.id);
             }
         }
         return messageSet;
@@ -141,6 +142,7 @@ class DtnStorage {
 
     void addDbEntry(long id, long ttl, long currentTime);
     void deleteExpiredMsgs();
+    void deleteMsg(int pdu);
     void storeMsg(byte[] bytes);
     String serializePDU(DtnPDU pdu);
     DtnPDU getPduFile(int id);
@@ -191,6 +193,7 @@ class DtnAgent extends UnetAgent {
             CapabilityReq req = new CapabilityReq(link, DatagramCapability.RELIABILITY);
             Message rsp = request(req, 500); // this could take a while if we have a lot of links
             if (rsp.getPerformative() == Performative.CONFIRM) {
+                subscribe(link);
                 reliableLinks.add(link);
             }
         }
@@ -198,6 +201,7 @@ class DtnAgent extends UnetAgent {
 
     // FIXME: How do we know whether a DatagramReq has come from Router or from RL?
     // If it has come from Router, it will not have the PDU information, but from RL it will have
+    // So maybe we discriminate on the basis of sender?
     Message processRequest(Message msg) {
         switch (msg) {
         case DatagramReq:
@@ -207,6 +211,7 @@ class DtnAgent extends UnetAgent {
                 def bytes = msg.getData();
                 storage.storeMsg(bytes);
             }
+            return ? // what is the Rsp type I can use here?
         case BeaconReq:
             if (State.IDLE) {
                 return new Message(msg, Performative.AGREE);
@@ -214,13 +219,16 @@ class DtnAgent extends UnetAgent {
             } else {
                 return new Message(msg, Performative.REFUSE);
             }
-        case DtnReq:
-        }
         return null;
     }
 
     void processMessage(Message msg) {
-
+        switch (msg) {
+        case DatagramNtf:
+            if (msg is success) { // FIXME: syntax?
+                storage.delete(msg.DtnId);
+            }
+        }
     }
 };
 ```
