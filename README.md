@@ -234,7 +234,7 @@ class DtnAgent extends UnetAgent {
 ```
 
 ## Open Issues
-* How do we differentiate between a message sent to DtnAgent from below and from above? A message coming from Router won't have the PDU fields.
+* How do we differentiate between a message sent to DtnAgent from below and from above? A message coming from Router won't have the PDU fields. Maybe we could use the sender field to discriminate?
 * Do we need a DtnReq/Ntf pair? If so, how can we send it on a Link?
 * Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent?
 * Should no Ntf and failed Ntf be handled the same way?
