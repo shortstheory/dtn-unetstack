@@ -27,6 +27,7 @@ We are relaxing some of the requirements for DTNs for the first iteration of thi
 
 Goals which will not be covered by the first iteration but which may be covered in the future are:
 
+* Dedicated ACK schemes. Though this is very important in DTNs, we are only focussing on single hop routing and we only need to make sure our message has reached the next hop node.
 * Multihop routing of PDUs.
 * Dynamic routing protocols.
 * Fragmentation and reassembly of large PDUs.
@@ -51,8 +52,9 @@ class DtnBeacon {
     TickerBehavior tb;
 
     DtnBeacon(DtnAgent agent, int duration) {
+        def phy = agentForService Services.PHYSICAL;
         tb = add new TickerBehavior(agent, duration, {
-            send new BeaconReq(recipient: agent.getAgentID(), channel: Physical.CONTROL));
+            phy << new BeaconReq(recipient: agent.getAgentID(), channel: Physical.CONTROL));
         }
     }
 
@@ -139,6 +141,7 @@ class DtnStorage {
 
     void addDbEntry(long id, long ttl, long currentTime);
     void deleteExpiredMsgs();
+    void storeMsg(byte[] bytes);
     String serializePDU(DtnPDU pdu);
     DtnPDU getPduFile(int id);
     DtnPDU deserializePDU(String s);
@@ -147,10 +150,85 @@ class DtnStorage {
 
 #### DtnAgent
 
-The DtnAgent is a UnetAgent which contains instances of the above classes. The DtnAgent will handle the sending of messages, sending and receiving of notifications, and 
+The DtnAgent is a UnetAgent which contains instances of the above classes. The DtnAgent will handle the sending of messages, sending and receiving of notifications, and logic for selecting the ReliableLink to be used.
+
+The DtnAgent will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
+
+This DtnAgent will receive datagrams from the Router. This means the DtnAgent will not be responsible for routing messages for the time being.
+
+```
+class DtnAgent extends UnetAgent {
+    // FIXME: the DtnBeacon and DtnStorage members below *can* be made inner classes
+    DtnBeacon beacon;
+    DtnStorage storage;
+    List<AgentID> reliableLinks;
+    AgentID router;
+
+    enum State {
+        IDLE, BUSY
+    }
+
+    State state;
+
+    void setup() {
+        state = State.IDLE;
+        register Services.LINK
+        register Services.DATAGRAM
+    }
+
+    void startup() {
+        beacon = new DtnBeacon(this, 1000);
+        storage = new DtnStorage(this, 1000);
+        def links = agentsForService(Services.LINK);
+
+        // I'm not really sure if this is required
+        phy = agentForService Services.PHYSICAL
+        subscribe(phy)
+
+        router = agentForService Services.ROUTING
+
+        for (def link : links) {
+            CapabilityReq req = new CapabilityReq(link, DatagramCapability.RELIABILITY);
+            Message rsp = request(req, 500); // this could take a while if we have a lot of links
+            if (rsp.getPerformative() == Performative.CONFIRM) {
+                reliableLinks.add(link);
+            }
+        }
+    }
+
+    // FIXME: How do we know whether a DatagramReq has come from Router or from RL?
+    // If it has come from Router, it will not have the PDU information, but from RL it will have
+    Message processRequest(Message msg) {
+        switch (msg) {
+        case DatagramReq:
+            if (msg.getReliability()) {
+                return new Message(msg, Performative.REFUSE);
+            } else {
+                def bytes = msg.getData();
+                storage.storeMsg(bytes);
+            }
+        case BeaconReq:
+            if (State.IDLE) {
+                return new Message(msg, Performative.AGREE);
+                state = State.BUSY;
+            } else {
+                return new Message(msg, Performative.REFUSE);
+            }
+        case DtnReq:
+        }
+        return null;
+    }
+
+    void processMessage(Message msg) {
+
+    }
+};
+```
 
 ## Open Issues
-
+* How do we differentiate between a message sent to DtnAgent from below and from above? A message coming from Router won't have the PDU fields.
+* Do we need a DtnReq/Ntf pair? If so, how can we send it on a Link?
+* Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent?
 * Should no Ntf and failed Ntf be handled the same way?
 * When we receive a non-success Ntf, should we switch over to a different link or should we keep retrying on the same link?
 * How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
