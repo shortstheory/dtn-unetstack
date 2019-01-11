@@ -134,10 +134,10 @@ class DtnStorage {
     void storeNewMsg(DtnPDU pdu) {
         String s = serializePDU(pdu);
         save(s);
-        addDbEntry(pdu.get(id), pdu.get(ttl), currentTime);
+        addDbEntry(pdu.get(id), pdu.get(ttl), currentTime); 
     }
 
-    void addDbEntry(long id, )
+    void addDbEntry(long id, long ttl, long currentTime);
     void deleteExpiredMsgs();
     String serializePDU(DtnPDU pdu);
     DtnPDU getPduFile(int id);
