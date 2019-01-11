@@ -122,7 +122,7 @@ class DtnStorage {
     Set<DtnMsg> getMsgsForNextHop(int nextHop) {
         var messageSet = db.get(nextHop);
 
-        foreach (var msg : messageSet) {
+        for (var msg : messageSet) {
             if (msg.ttl + msg.arrivalTime > currentTime) {
                 delete(msg);
                 delete(PDU);
@@ -130,15 +130,28 @@ class DtnStorage {
         }
         return messageSet;
     }
-    getPduFile(int id);
-    deleteExpiredMsgs();
-    serializePDU();
-    deserializePDU();
+
+    void storeNewMsg(DtnPDU pdu) {
+        String s = serializePDU(pdu);
+        save(s);
+        addDbEntry(pdu.get(id), pdu.get(ttl), currentTime);
+    }
+
+    void addDbEntry(long id, )
+    void deleteExpiredMsgs();
+    String serializePDU(DtnPDU pdu);
+    DtnPDU getPduFile(int id);
+    DtnPDU deserializePDU(String s);
 };
 ```
+
+#### DtnAgent
+
+The DtnAgent is a UnetAgent which contains instances of the above classes. The DtnAgent will handle the sending of messages, sending and receiving of notifications, and 
 
 ## Open Issues
 
 * Should no Ntf and failed Ntf be handled the same way?
 * When we receive a non-success Ntf, should we switch over to a different link or should we keep retrying on the same link?
 * How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
+* No uint32 in Java for decoding PDUs.
