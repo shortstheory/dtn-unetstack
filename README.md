@@ -147,6 +147,7 @@ class DtnStorage {
     String serializePDU(DtnPDU pdu);
     DtnPDU getPduFile(int id);
     DtnPDU deserializePDU(String s);
+    DatagramReq getDatagramReq(long id);
 };
 ```
 
@@ -201,9 +202,10 @@ class DtnAgent extends UnetAgent {
 
     // FIXME: How do we know whether a DatagramReq has come from Router or from RL?
     // If it has come from Router, it will not have the PDU information, but from RL it will have
-    // So maybe we discriminate on the basis of sender?
+    // So maybe we discriminate on the basis of Recipient?
     Message processRequest(Message msg) {
         switch (msg) {
+        // FIXME: Need to distinguish DatagramReqs based on the origin
         case DatagramReq:
             if (msg.getReliability()) {
                 return new Message(msg, Performative.REFUSE);
@@ -211,8 +213,8 @@ class DtnAgent extends UnetAgent {
                 def bytes = msg.getData();
                 storage.storeMsg(bytes);
             }
-            return ? // what is the Rsp type I can use here?
-        case BeaconReq:
+            return ? // FIXME: what is the Rsp type I can use here?
+        case BeaconReq: // I am not really sure what a beacon means in this context
             if (State.IDLE) {
                 return new Message(msg, Performative.AGREE);
                 state = State.BUSY;
@@ -225,10 +227,20 @@ class DtnAgent extends UnetAgent {
     void processMessage(Message msg) {
         switch (msg) {
         case DatagramNtf:
-            if (msg is success) { // FIXME: syntax?
+            if (msg.successFullySent()) { // FIXME: syntax?
                 storage.delete(msg.DtnId);
+            } else {
+                for (def link : reliableLinks) {
+                    link << send(getDatagramReq(msg.DtnId));
+                }
             }
         }
+        case BeaconRsp: // I don't know the response type of a Beacon, so this is just a placeholder
+            def msgSet = getMsgsForNextHop(msg.getSender)
+            for (def msg : msgSet) {
+                // choose the best link depending on some heurestics
+                link << msg;
+            }
     }
 };
 ```
