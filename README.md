@@ -29,7 +29,7 @@ We are relaxing some of the requirements for DTNs for the first iteration of thi
 
 Goals which will not be covered by the first iteration but which may be covered in the future are:
 
-* Dedicated ACK schemes. Though this is very important in DTNs, we are only focussing on single hop routing and we only need to make sure our message has reached the next hop node.
+* Dedicated ACK schemes. Though this is very important in DTNs, we are only focussing on single hop routing and we only need to make sure our message has reached the next hop node. This will be covered by using ReliableLinks for single hops.
 * Multihop routing of PDUs.
 * Dynamic routing protocols.
 * Fragmentation and reassembly of large PDUs.
@@ -157,7 +157,9 @@ The DtnAgent is a UnetAgent which contains instances of the above classes. The D
 
 The DtnAgent will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
 
-This DtnAgent will receive datagrams from the Router. This means the DtnAgent will not be responsible for routing messages for the time being.
+This DtnAgent will receive Datagrams from the Router. This means the DtnAgent will not be responsible for routing messages for the time being.
+
+If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the me Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
 ```
 class DtnAgent extends UnetAgent {
