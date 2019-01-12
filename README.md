@@ -96,7 +96,7 @@ The DtnStorage class will handle the SCAF mechanism. It will track PDUs, manage 
 
 Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, Arrival Time, and TTL of the PDU *at* the time of arrival. This database will be stored on the persistent storage.
 
-Alternatively, we can use a HashSet, keyed by the Next Hop node. In the Set part of the HashSet, we will store a tuple of the PDU ID, Arrival Time, and TTL.
+Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID, Arrival Time, and TTL.
 
 The PDUs themselves will be serialized to JSON for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
