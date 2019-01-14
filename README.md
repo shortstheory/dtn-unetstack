@@ -248,10 +248,10 @@ class DtnAgent extends UnetAgent {
 ```
 
 ## Open Issues
-* How do we differentiate between a message sent to DtnAgent from below and from above? A message coming from Router won't have the PDU fields. Maybe we could use the sender field to discriminate?
-* Do we need a DtnReq/Ntf pair? If so, how can we send it on a Link?
-* Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent?
-* Should no Ntf and failed Ntf be handled the same way?
-* When we receive a non-success Ntf, should we switch over to a different link or should we keep retrying on the same link?
+* How do we differentiate between a message sent to DtnAgent from Link and from Router? A message coming from Router won't have the PDU fields. Maybe we could use getRecipient field to discriminate between these two cases?
+    * Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent? Or will the DtnAgent fill in the TTLs
+* Do we need a DtnReq/Ntf pair?
+* Should no Ntf and failed Ntf for delivery of a Datagram be handled the same way?
+* When we receive a failed Ntf for delivery, should we switch over to a different link or should we keep retrying on the same link?
 * How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
 * No uint32 in Java for decoding PDUs.
