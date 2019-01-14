@@ -1,4 +1,4 @@
-# Delay Tolerant Networks in UNETSTACK
+# Delay Tolerant Networks in UnetStack
 ## Design Document
 *Arnav Dhamija, 2019*
 
