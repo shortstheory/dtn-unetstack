@@ -277,4 +277,3 @@ class DtnAgent extends UnetAgent {
 * Should no Ntf and failed Ntf for delivery of a Datagram be handled the same way?
 * When we receive a failed Ntf for delivery, should we switch over to a different link or should we keep retrying on the same link?
 * How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
-* No uint32 in Java for decoding PDUs.
