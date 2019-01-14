@@ -51,6 +51,7 @@ The BeaconReq should also some way of informing other nodes about which Reliable
 **Alternative:** There doesn't seem to be a mechanism to resolve the Agent class from the AgentID. So we can send the Beacon message on each of the links and see which links we get a response on to determine which reliable links are available.
 
 ```
+// This will be an inner class of DtnAgent!
 class DtnBeacon {
     int duration;
     TickerBehavior tb;
@@ -58,13 +59,16 @@ class DtnBeacon {
     DtnBeacon(DtnAgent agent, int duration) {
         def phy = agentForService Services.PHYSICAL;
         tb = add new TickerBehavior(agent, duration, {
-            phy << new BeaconReq(recipient: agent.getAgentID(), channel: Physical.CONTROL));
+            def beacon = new DtnBeaconPdu(IDLE, 0);
+            phy << new DatagramReq(recipient: agent.getAgentID(), channel: Physical.CONTROL), data: getCurrentState());
         }
     }
 
     void stopBroadcasting() {
         tb.stop();
     }
+
+    void setBeaconState(State s);
 
     // FIXME: Find a way to broadcast information about the ReliableLinks available on the node
 
@@ -107,8 +111,8 @@ When the DtnAgent finds a new node, it will query the database/data structure fo
 On a periodic basis (with a TickerBehavior), DtnStorage will scan the available files for their TTLs and will delete any files which have expired. The frequency of cleaning old files can probably be adjusted based on the amount of buffer space left on the node.
 
 ```
+// This will also be an inner class of DTNAgent!
 class DtnStorage {
-
     class DtnMsg {
         long id;
         long ttl;
@@ -165,16 +169,21 @@ This DtnAgent will receive Datagrams from the Router. This means the DtnAgent wi
 
 If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
+![](Connection.png)
+
+**!Needs changes!**
 ```
 class DtnAgent extends UnetAgent {
-    // FIXME: the DtnBeacon and DtnStorage members below *can* be made inner classes
+
+    // These are inner classes, but I wrote their definitions above for brevity
     DtnBeacon beacon;
     DtnStorage storage;
+
     List<AgentID> reliableLinks;
     AgentID router;
 
     enum State {
-        IDLE, BUSY
+        IDLE, HANDSHAKE, CONNECTED
     }
 
     State state;
@@ -187,7 +196,7 @@ class DtnAgent extends UnetAgent {
 
     void startup() {
         beacon = new DtnBeacon(this, 1000);
-        storage = new DtnStorage(this, 1000);
+        storage = new DtnStorage(this, 100000);
         def links = agentsForService(Services.LINK);
 
         // I'm not really sure if this is required
@@ -206,34 +215,48 @@ class DtnAgent extends UnetAgent {
         }
     }
 
+    FSMBehavior fsm = FSMBuilder.build {
+        state(State.IDLE) {
+            if receive IDLE Beacon or receive SETUP request
+                goto HANDSHAKE 
+        }
+        state(State.HANDSHAKE) {
+            if receive IDLE Beacon
+                send SETUP request on choice of RL
+            else if receive SETUP request
+                send ACCEPT
+            else if receive ACCEPT
+                goto CONNECTED
+        }
+        state(State.CONNECTED) {
+            send PDUs
+        }
+    }
+
     // FIXME: How do we know whether a DatagramReq has come from Router or from RL?
     // If it has come from Router, it will not have the PDU information, but from RL it will have
     // So maybe we discriminate on the basis of Recipient?
     Message processRequest(Message msg) {
         switch (msg) {
         // FIXME: Need to distinguish DatagramReqs based on the origin
-        case DatagramReq:
+        case DataMsg:
             if (msg.getReliability()) {
                 return new Message(msg, Performative.REFUSE);
             } else {
                 def bytes = msg.getData();
                 storage.storeMsg(bytes);
-            }
-            return ? // FIXME: what is the Rsp type I can use here?
-        case BeaconReq: // I am not really sure what a beacon means in this context
-            if (State.IDLE) {
                 return new Message(msg, Performative.AGREE);
-                state = State.BUSY;
-            } else {
-                return new Message(msg, Performative.REFUSE);
             }
+        case ControlMsg:
+            trigger FSM states
         return null;
     }
 
     void processMessage(Message msg) {
         switch (msg) {
+            // this code needs to be figured out
         case DatagramNtf:
-            if (msg.successFullySent()) { // FIXME: syntax?
+            if (success && msg is DataMsg) { // FIXME: syntax?
                 storage.delete(msg.DtnId);
             } else {
                 for (def link : reliableLinks) {
@@ -241,12 +264,6 @@ class DtnAgent extends UnetAgent {
                 }
             }
         }
-        case BeaconRsp: // I don't know the response type of a Beacon, so this is just a placeholder
-            def msgSet = getMsgsForNextHop(msg.getSender)
-            for (def msg : msgSet) {
-                // choose the best link depending on some heurestics
-                link << msg;
-            }
     }
 };
 ```
