@@ -48,6 +48,8 @@ The Beacon is a part of the DTNAgent. Its task is to periodically send a message
 
 The BeaconReq should also some way of informing other nodes about which ReliableLinks are available on the node. Neighboring nodes can use this information to decide the best Link to send a DatagramReq on.
 
+**Alternative:** There doesn't seem to be a mechanism to resolve the Agent class from the AgentID. So we can send the Beacon message on each of the links and see which links we get a response on to determine which reliable links are available.
+
 ```
 class DtnBeacon {
     int duration;
@@ -157,9 +159,11 @@ The DtnAgent is a UnetAgent which contains instances of the above classes. The D
 
 The DtnAgent will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
 
-This DtnAgent will receive Datagrams from the Router. This means the DtnAgent will not be responsible for routing messages for the time being.
+This DtnAgent will receive Datagrams from the Router. This means the DtnAgent will not be responsible for routing messages for the time being. It will also receive messages from Reliable links which need to be passed up to the router. The below block diagram shows illustrates this:
 
-If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the me Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
+![](DTNAgent.png)
+
+If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
 ```
 class DtnAgent extends UnetAgent {
@@ -248,6 +252,8 @@ class DtnAgent extends UnetAgent {
 ```
 
 ## Open Issues
+* Should Beacons be sent to a topic or sent to a Broadcast Address instead?
+* How does Router know whether a DatagramReq has the Router headers or not? We need to do the same thing for DTNAgent
 * How do we differentiate between a message sent to DtnAgent from Link and from Router? A message coming from Router won't have the PDU fields. Maybe we could use getRecipient field to discriminate between these two cases?
     * Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent? Or will the DtnAgent fill in the TTLs
 * Do we need a DtnReq/Ntf pair?
