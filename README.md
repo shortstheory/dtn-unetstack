@@ -15,7 +15,7 @@ In this project, we are attempting to use an adaptation of DTN protocols to impr
 ### Use Cases
 
 * Robotic SWANs are used for collecting marine data through the use of on-board water probes. These SWANs have multiple network interfaces through which data can be transmitted. However, due to inclement weather conditions, it is also possible that no data gets transmitted at all. DTNs can save the day in this case by relaying critical information through nearby nodes which may have better network access. Thanks to the Store-Carry-And-Forward (SCAF) mechanism of DTNs, a SWAN can also wait until network conditions improve to send data.
-* Underwater networks can consist of static sensors and an AUV for relaying the data from the sensor. Due to battery limitations, these sensors have constraints on the number of times they can transmit information to an AUV. A protocol which enables the sensor to only send data when it has detected an AUV relay is nearby can help in saving power. From the AUV, the DTN can have the capability to automatically upload the data stored in the AUV's DTN Agent to removable storage.
+* Underwater networks can consist of static sensors and an AUV for relaying the data from the sensor. Due to battery limitations, these sensors have constraints on the number of times they can transmit information to an AUV. A protocol which enables the sensor to only send data when it has detected an AUV relay is nearby can help in saving power. From the AUV, the DTN can have the capability to automatically upload the data stored in the AUV's persistent storage to a removable storage device.
 * DTNs could be used to help in disseminating information in swarms such as the STARFISH network.
 
 ### Initial Goals
@@ -45,7 +45,9 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 #### DtnBeacon
 
-The Beacon is a part of the DTNA. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending a BeaconReq with the Recipient set to the DTNA.
+The Beacon is a part of the DTNA. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending an empty DatagramReq with the Recipient set to the DTNA.
+
+Beacons are not explicitly required to advertise the existence of links. The DTNA will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link.
 
 ```
 class DtnBeacon {
@@ -66,9 +68,9 @@ class DtnBeacon {
 };
 ```
 
-#### DtnPDU
+#### DtnPdu
 
-The PDU will hold the data to be transmitted along with the DTN metadata. For now, we just need to keep the TTL along with the data.
+The PDU will hold the data to be transmitted along with the DTN metadata. We need to maintain the TTL and ID along with the data.
 
 Here, the TTL represents the number of seconds left before the PDU expires. Once the PDU has expired, we delete it from persistent storage.
 
@@ -76,12 +78,18 @@ The ID is a nonce for uniquely identifying each PDU for tracking purposes. It is
 
 ```
 class DtnPDU extends PDU {
+    int pduLength;
+
+    DtnPDU(int length) {
+        pduLength = length;
+    }
+
     void format() {
-        length(512);
+        length(pduLength);
         uint32("id");
         uint32("ttl");
-        char("data", 504);
-        padding(0xff); // can be removed
+        char("data", pduLength-8);
+        padding(0xff); // do we really need padding?
     }
 };
 ```
@@ -147,7 +155,7 @@ class DtnStorage {
 };
 ```
 
-#### DtnAgent
+#### DTNA
 
 The DtnAgent is a UnetAgent which contains instances of the above classes. The DtnAgent will handle the sending of messages, sending and receiving of notifications, and logic for selecting the ReliableLink to be used.
 
@@ -157,9 +165,13 @@ This DtnAgent will receive Datagrams from the Router. This means the DtnAgent wi
 
 ![](DTNAgent.png)
 
-If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
+(Yellow == DatagramNtf, Purple == DatagramReq)
 
-![](Connection.png)
+For now, we trust the Link to take care of notifications and the resending of payloads. The DTNA will subscribe to these topics to mark PDUs ready for deletion.
+
+**Future work:**
+
+If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
 **!Needs changes!**
 ```
@@ -260,11 +272,7 @@ class DtnAgent extends UnetAgent {
 
 ## Open Issues
 * Should Beacons be sent to a topic or sent to a Broadcast Address instead?
-* How does Router know whether a DatagramReq has the Router headers or not? We need to do the same thing for DTNAgent
 * How do we differentiate between a message sent to DtnAgent from Link and from Router? A message coming from Router won't have the PDU fields. Maybe we could use getRecipient field to discriminate between these two cases?
-    * Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent? Or will the DtnAgent fill in the TTLs
-* Do we need a DtnReq/Ntf pair?
-* Should no Ntf and failed Ntf for delivery of a Datagram be handled the same way?
-* When we receive a failed Ntf for delivery, should we switch over to a different link or should we keep retrying on the same link?
-* How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
-* Lost Beacon / disconnection mechanism?
+    * This comes from whether it's a DatagramNtf or DatagramReq
+* Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent? Or will the DtnAgent fill in the TTLs
+        * TTLs will be added to the DatagramReq from the app layer
