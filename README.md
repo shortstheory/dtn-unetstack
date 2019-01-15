@@ -100,7 +100,7 @@ The DtnStorage class will handle the SCAF mechanism. It will track PDUs, manage 
 
 Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, Arrival Time, and TTL of the PDU *at* the time of arrival. This database will be stored on the persistent storage.
 
-Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID, Arrival Time, and TTL.
+Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time.
 
 The PDUs themselves will be serialized to JSON for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
@@ -113,8 +113,7 @@ On a periodic basis (with a TickerBehavior), DtnStorage will scan the available 
 class DtnStorage {
     class DtnMsg {
         long id;
-        long ttl;
-        long arrivalTime;
+        long expiryTime;
     };
 
     // This data structure is keyed by the next hop
@@ -131,7 +130,7 @@ class DtnStorage {
         var messageSet = db.get(nextHop);
 
         for (var msg : messageSet) {
-            if (msg.ttl + msg.arrivalTime > currentTime) {
+            if (msg.expiryTime > currentTime) {
                 deleteMsg(msg.id);
             }
         }
@@ -141,10 +140,10 @@ class DtnStorage {
     void storeNewMsg(DtnPDU pdu) {
         String s = serializePDU(pdu);
         save(s);
-        addDbEntry(pdu.get(id), pdu.get(ttl), currentTime); 
+        addDbEntry(pdu.get(id), pdu.get(ttl)+currentTime);
     }
 
-    void addDbEntry(long id, long ttl, long currentTime);
+    void addDbEntry(long id, long expiryTime);
     void deleteExpiredMsgs();
     void deleteMsg(int pdu);
     void storeMsg(byte[] bytes);
