@@ -87,7 +87,7 @@ The PDUs themselves will be serialized to JSON for storage on the node using the
 
 When the DTNA finds a new node, it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. If the PDU is still alive, the PDU's TTL will be reduced by (currentTime - arrivalTime). The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding JSON file is deleted along with it. If the agent receives a notification about delivery failure, it will try retransmitting the PDU periodically while 1) the other node is still "visible" 2) the PDU is Still Alive.
 
-On a periodic basis (with a TickerBehavior), DtnStorage will scan the available files for their TTLs and will delete any files which have expired. The frequency of cleaning old files can probably be adjusted based on the amount of buffer space left on the node.
+On a periodic basis (with a TickerBehavior), DtnStorage will scan the available files for their TTLs and will delete any files which have expired. The frequency of cleaning old files can probably be adjusted based on the amount of buffer space left on the node. The TTL will come from the application layer.
 
 ```
 // This will also be an inner class of DTNA!
@@ -131,7 +131,7 @@ class DtnStorage {
     void storeMsg(byte[] bytes);
     String serializePDU(DtnPDU pdu);
     DtnPDU getPdu(int id);
-    DtnPDU deserializePDU(String s);
+    DtnPDU deserializePDU(long id);
     DatagramReq getDatagramReq(long id);
 };
 ```
@@ -195,6 +195,9 @@ class DTNA extends UnetAgent {
         beacon = add new TickerBehavior(BEACON_DURATION, {
             reliableLink << new DatagramReq(channel: Physical.CONTROL, to: Address.BROADCAST)
         })
+
+        onSendingMessage:
+            beacon.reset();
     }
 
     void getReliableLink() {
@@ -215,7 +218,7 @@ class DTNA extends UnetAgent {
         switch (msg) {
         // FIXME: Need to distinguish DatagramReqs based on the origin
         case DatagramReq:
-            if (msg.getReliability() || msg.getTTL() == NaN) {
+            if (msg.getReliability() || msg.getTTL() == NaN || storage.bufferFull()) {
                 return new Message(msg, Performative.REFUSE);
             } else {
                 def bytes = msg.getData();
@@ -236,6 +239,12 @@ class DTNA extends UnetAgent {
             if (msg.to != addr) {
                 // now we know this node is alive!
                 // start sending messages residing in the SCAF to it
+                def msgs = getMsgsForNextHop(addr);
+                for (def msg : msgs) {
+                    def bytes = deserializeJSON(msg.id);
+                    // TRY REQUEST INSTEAD HERE!!!
+                    send new DatagramReq(to: msg.to, data: bytes);
+                }
             }
             break;
         case DatagramNtf:
@@ -261,7 +270,10 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* Don't send beacon unless you get an AGREE from the layer
+* DatagramFailedNtf/DatagramDeliveryNtf does not give me information about which DatagramReq it is in response to
+* Should DeliveryNtfs be broadcast on a topic?
+* Generate a failure when we have TTL exceeded
 * What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
+    * atm we are bundling it in a DatagramReq and sending it off to Router
 * What is the difference between calling a fxn and using a 1-shot behavior?
-* When is DatagramReq replied to with a failure message?
-* How does recipient work for Broadcast messages?
