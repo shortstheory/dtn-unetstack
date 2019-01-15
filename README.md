@@ -49,25 +49,6 @@ The Beacon is a part of the DTNA. Its task is to periodically send a message to 
 
 Beacons are not explicitly required to advertise the existence of links. The DTNA will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link.
 
-```
-class DtnBeacon {
-    int duration;
-    TickerBehavior tb;
-
-    DtnBeacon(DtnAgent agent, int duration) {
-        def phy = agentForService Services.PHYSICAL;
-        tb = add new TickerBehavior(agent, duration, {
-            phy << new DatagramReq(recipient: agent.getAgentID(), channel: Physical.CONTROL));
-        }
-    }
-
-    void stopBroadcasting() {
-        tb.stop();
-    }
-    // setters and getters for other things
-};
-```
-
 #### DtnPdu
 
 The PDU will hold the data to be transmitted along with the DTN metadata. We need to maintain the TTL and ID along with the data.
@@ -104,12 +85,13 @@ Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of th
 
 The PDUs themselves will be serialized to JSON for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
-When the DtnAgent finds a new node, it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. If the PDU is still alive, the PDU's TTL will be reduced by (currentTime - arrivalTime). The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding JSON file is deleted along with it. If the agent receives a notification about delivery failure or it doesn't get a notification at all, it will try retransmitting the PDU periodically while 1) the other node is still "visible" 2) the PDU is Still Alive.
+When the DTNA finds a new node, it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. If the PDU is still alive, the PDU's TTL will be reduced by (currentTime - arrivalTime). The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding JSON file is deleted along with it. If the agent receives a notification about delivery failure, it will try retransmitting the PDU periodically while 1) the other node is still "visible" 2) the PDU is Still Alive.
 
 On a periodic basis (with a TickerBehavior), DtnStorage will scan the available files for their TTLs and will delete any files which have expired. The frequency of cleaning old files can probably be adjusted based on the amount of buffer space left on the node.
 
 ```
-// This will also be an inner class of DTNAgent!
+// This will also be an inner class of DTNA!
+// should this be allowed to make the DatagramReqs or should that be offloaded to the DTNA?
 class DtnStorage {
     class DtnMsg {
         long id;
@@ -119,17 +101,17 @@ class DtnStorage {
     // This data structure is keyed by the next hop
     // The value is a Set of PDU ID, TTL, and arrival time respectively
     HashMap<int, Set<DtnMsg>> db;
+    TickerBehavior tb;
 
-    DtnStorage(DtnAgent agent, int duration) {
+    DtnStorage(DTNA agent, int duration) {
         tb = add new TickerBehavior(agent, duration, {
             deleteExpiredMsgs();
         }
     }
 
     Set<DtnMsg> getMsgsForNextHop(int nextHop) {
-        var messageSet = db.get(nextHop);
-
-        for (var msg : messageSet) {
+        def messageSet = db.get(nextHop);
+        for (def msg : messageSet) {
             if (msg.expiryTime > currentTime) {
                 deleteMsg(msg.id);
             }
@@ -148,7 +130,7 @@ class DtnStorage {
     void deleteMsg(int pdu);
     void storeMsg(byte[] bytes);
     String serializePDU(DtnPDU pdu);
-    DtnPDU getPduFile(int id);
+    DtnPDU getPdu(int id);
     DtnPDU deserializePDU(String s);
     DatagramReq getDatagramReq(long id);
 };
@@ -156,122 +138,130 @@ class DtnStorage {
 
 #### DTNA
 
-The DtnAgent is a UnetAgent which contains instances of the above classes. The DtnAgent will handle the sending of messages, sending and receiving of notifications, and logic for selecting the ReliableLink to be used.
+The DTNA is a UnetAgent which contains instances of the above classes. The DTNA will handle the sending of messages, sending and receiving of notifications, and logic for selecting the ReliableLink to be used.
 
-The DtnAgent will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
+The DTNA will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
 
-This DtnAgent will receive Datagrams from the Router. This means the DtnAgent will not be responsible for routing messages for the time being. It will also receive messages from Reliable links which need to be passed up to the router. The below block diagram illustrates this:
+This DTNA will receive Datagrams from the Router. This means the DTNA will not be responsible for routing messages for the time being. It will also receive messages from Reliable links which need to be passed up to the router. The below block diagram illustrates this:
 
 ![](DTNAgent.png)
 
 (Yellow == DatagramNtf, Purple == DatagramReq)
 
-For now, we trust the Link to take care of notifications and the resending of payloads. The DTNA will subscribe to these topics to mark PDUs ready for deletion.
+For now, we trust the Link to take care of notifications and the resending of payloads. The DTNA will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first ReliableLink we can find.
 
-**Future work:**
+We only advertise success, not failure! This is because a failed message at one instant may succeed later.
 
-If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
+**Future work:** If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
 **!Needs changes!**
 ```
-class DtnAgent extends UnetAgent {
+class DTNA extends UnetAgent {
 
     // These are inner classes, but I wrote their definitions above for brevity
-    DtnBeacon beacon;
     DtnStorage storage;
 
-    List<AgentID> reliableLinks;
+    AgentID reliableLink;
     AgentID router;
-
-    enum State {
-        IDLE, HANDSHAKE, CONNECTED
-    }
-
-    State state;
+    AgentID notify;
+    TickerBehavior beacon;
+    int addr;
+    final int BEACON_DURATION = 100000; // should this be a param?
+    final int STORAGE_DURATION = 100000;
 
     void setup() {
-        state = State.IDLE;
         register Services.LINK
         register Services.DATAGRAM
     }
 
     void startup() {
-        beacon = new DtnBeacon(this, 1000);
-        storage = new DtnStorage(this, 100000);
-        def links = agentsForService(Services.LINK);
+        storage = new DtnStorage(this, STORAGE_DURATION);
 
         // I'm not really sure if this is required
         phy = agentForService Services.PHYSICAL
         subscribe(phy)
-
+        subscribe(topic(phy, Physical.SNOOP))
         router = agentForService Services.ROUTING
 
+        notify = topic()
+
+        def nodeInfo = agentForService Services.NODE_INFO
+        addr = get(nodeInfo, NodeInfoParam.address)
+
+        add new OneShotBehavior({
+            getReliableLink();
+        })
+
+        beacon = add new TickerBehavior(BEACON_DURATION, {
+            reliableLink << new DatagramReq(channel: Physical.CONTROL, to: Address.BROADCAST)
+        })
+    }
+
+    void getReliableLink() {
+        reliableLinks.clear();
+        def links = agentsForService(Services.LINK);
         for (def link : links) {
             CapabilityReq req = new CapabilityReq(link, DatagramCapability.RELIABILITY);
             Message rsp = request(req, 500); // this could take a while if we have a lot of links
             if (rsp.getPerformative() == Performative.CONFIRM) {
                 subscribe(link);
-                reliableLinks.add(link);
+                reliableLink = link;
+                break;
             }
         }
     }
 
-    FSMBehavior fsm = FSMBuilder.build {
-        state(State.IDLE) {
-            if receive IDLE Beacon or receive SETUP request
-                goto HANDSHAKE 
-        }
-        state(State.HANDSHAKE) {
-            if receive IDLE Beacon
-                send SETUP request on choice of RL
-            else if receive SETUP request
-                send ACCEPT
-            else if receive ACCEPT
-                goto CONNECTED
-        }
-        state(State.CONNECTED) {
-            send PDUs
-        }
-    }
-
-    // FIXME: How do we know whether a DatagramReq has come from Router or from RL?
-    // If it has come from Router, it will not have the PDU information, but from RL it will have
-    // So maybe we discriminate on the basis of Recipient?
     Message processRequest(Message msg) {
         switch (msg) {
         // FIXME: Need to distinguish DatagramReqs based on the origin
-        case DataMsg:
-            if (msg.getReliability()) {
+        case DatagramReq:
+            if (msg.getReliability() || msg.getTTL() == NaN) {
                 return new Message(msg, Performative.REFUSE);
             } else {
                 def bytes = msg.getData();
                 storage.storeMsg(bytes);
                 return new Message(msg, Performative.AGREE);
             }
-        case ControlMsg:
-            trigger FSM states
         return null;
+    }
+
+    int getMTU() {
+        return reliableLink.getMTU-8;
     }
 
     void processMessage(Message msg) {
         switch (msg) {
-            // this code needs to be figured out
-        case DatagramNtf:
-            if (success && msg is DataMsg) { // FIXME: syntax?
-                storage.delete(msg.DtnId);
-            } else {
-                for (def link : reliableLinks) {
-                    link << send(getDatagramReq(msg.DtnId));
-                }
+            // do we need a protocol number
+        case RxFrameNtf:
+            if (msg.to != addr) {
+                // now we know this node is alive!
+                // start sending messages residing in the SCAF to it
             }
+            break;
+        case DatagramNtf:
+            DtnPDU pdu(reliableLink.getMTU());
+            def data = pdu.decode(msg.data);
+            // in multihop I'm not too sure what will happen here:
+            // but for now we can just send it to router and see what happens
+            def req = new DatagramReq(data: data)
+            router.send(req); // ???
+        case DatagramDeliveryNtf:
+            // how do we get the message to which it is mapped?
+            notify << msg;
+            break;
+        case DatagramFailureNtf:
+
+            // same issue and moreover, who do we send these notifs to?
+            break;
         }
+
+
     }
 };
 ```
 
 ## Open Issues
-* Should Beacons be sent to a topic or sent to a Broadcast Address instead?
-* How do we differentiate between a message sent to DtnAgent from Link and from Router? A message coming from Router won't have the PDU fields. Maybe we could use getRecipient field to discriminate between these two cases?
-    * This comes from whether it's a DatagramNtf or DatagramReq
-* Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent? Or will the DtnAgent fill in the TTLs
-        * TTLs will be added to the DatagramReq from the app layer
+* What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
+* What is the difference between calling a fxn and using a 1-shot behavior?
+* When is DatagramReq replied to with a failure message?
+* How does recipient work for Broadcast messages?

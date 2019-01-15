@@ -16,3 +16,4 @@ phy << new DatagramReq(to: 1, data: [1,2,3])
 phy << new DatagramReq(to: 2, protocol: Protocol.USER)
 
 phy << new DatagramReq(to: 2, protocol: Protocol.DATA)
+link << new DatagramReq(to: 2, protocol: Protocol.USER, data: [1,2,3], reliability: true)
