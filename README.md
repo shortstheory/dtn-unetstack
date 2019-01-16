@@ -94,45 +94,55 @@ On a periodic basis (with a TickerBehavior), DtnStorage will scan the available 
 // should this be allowed to make the DatagramReqs or should that be offloaded to the DTNA?
 class DtnStorage {
     class DtnMsg {
-        long id;
+        int nextHop;
         long expiryTime;
     };
 
-    // This data structure is keyed by the next hop
-    // The value is a Set of PDU ID, TTL, and arrival time respectively
-    HashMap<int, Set<DtnMsg>> db;
-    TickerBehavior tb;
+    HashMap<long, DtnMsg> db;
+    HashMap<String, long> datagramMap;
 
+    TickerBehavior tb;
     DtnStorage(DTNA agent, int duration) {
+        // this may not even be required since we check ttls before sending anyway
         tb = add new TickerBehavior(agent, duration, {
             deleteExpiredMsgs();
         }
     }
 
-    Set<DtnMsg> getMsgsForNextHop(int nextHop) {
-        def messageSet = db.get(nextHop);
-        for (def msg : messageSet) {
-            if (msg.expiryTime > currentTime) {
+    Set<DtnMsg> getNextHopMsgs(int nextHop) {
+        Set<DtnMsg> msgs;
+        for (def msg : db) {
+            if (currentTime > msg.expiryTime) {
                 deleteMsg(msg.id);
+                continue;
+            }
+            if (msg.nextHop == nextHop) {
+                msgs.add(msg);
             }
         }
-        return messageSet;
+        return msgs;
     }
 
-    void storeNewMsg(DtnPDU pdu) {
+    void savePdu(DtnPDU pdu) {
         String s = serializePDU(pdu);
         save(s);
-        addDbEntry(pdu.get(id), pdu.get(ttl)+currentTime);
+        addDbEntry(pdu.get(id), pdu.get(nextHop), pdu.get(ttl)+currentTime);
     }
 
-    void addDbEntry(long id, long expiryTime);
+    void deleteMsg(int pduId) {
+        removeDbEntry(id);
+        delete(id);
+    }
+
+    void addDbEntry(long id, int nextHop, long expiryTime);
+    void removeDbEntry(long id);
     void deleteExpiredMsgs();
-    void deleteMsg(int pdu);
-    void storeMsg(byte[] bytes);
+    void deleteMsg(int pduId);
+    int bufferFreeCapacity();
     String serializePDU(DtnPDU pdu);
+    DtnPDU deserializePDU(String s);
     DtnPDU getPdu(int id);
-    DtnPDU deserializePDU(long id);
-    DatagramReq getDatagramReq(long id);
+    Set<DtnMsgs> getNextHopMsgs(int nextHop);
 };
 ```
 
@@ -158,12 +168,13 @@ We only advertise success, not failure! This is because a failed message at one 
 ```
 class DTNA extends UnetAgent {
 
-    // These are inner classes, but I wrote their definitions above for brevity
+    // These can inner classes / part of the same pkg
     DtnStorage storage;
 
     AgentID reliableLink;
     AgentID router;
     AgentID notify;
+
     TickerBehavior beacon;
     int addr;
     final int BEACON_DURATION = 100000; // should this be a param?
@@ -263,17 +274,18 @@ class DTNA extends UnetAgent {
             // same issue and moreover, who do we send these notifs to?
             break;
         }
-
-
     }
 };
 ```
 
 ## Open Issues
 * Don't send beacon unless you get an AGREE from the layer
-* DatagramFailedNtf/DatagramDeliveryNtf does not give me information about which DatagramReq it is in response to
 * Should DeliveryNtfs be broadcast on a topic?
 * Generate a failure when we have TTL exceeded
 * What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
     * atm we are bundling it in a DatagramReq and sending it off to Router
 * What is the difference between calling a fxn and using a 1-shot behavior?
+* How can I print messages in the shell?
+
+## Resolved
+* DatagramFailedNtf/DatagramDeliveryNtf does not give me information about which DatagramReq it is in response to
