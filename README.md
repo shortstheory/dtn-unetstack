@@ -79,7 +79,7 @@ class DtnPDU extends PDU {
 
 The DtnStorage class will handle the SCAF mechanism. It will track PDUs, manage storage on the node and will delete expired PDUs.
 
-Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, Arrival Time, and TTL of the PDU *at* the time of arrival. This database will be stored on the persistent storage.
+Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, and the Expiry Time based on the node's own clock. This database will be stored on the persistent storage.
 
 Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time.
 
@@ -160,7 +160,7 @@ This DTNA will receive Datagrams from the Router. This means the DTNA will not b
 
 For now, we trust the Link to take care of notifications and the resending of payloads. The DTNA will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first ReliableLink we can find.
 
-We only advertise success, not failure! This is because a failed message at one instant may succeed later.
+**NOTE:** We only advertise success, not failure! This is because a failed message at one instant may succeed later. But if the TTL of a message expires, we must advertise this.
 
 **Future work:** If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
@@ -175,7 +175,10 @@ class DTNA extends UnetAgent {
     AgentID router;
     AgentID notify;
 
+    HashMap<String, long> datagramMap;
+
     TickerBehavior beacon;
+    TickerBehavior sweepStorage;
     int addr;
     final int BEACON_DURATION = 100000; // should this be a param?
     final int STORAGE_DURATION = 100000;
@@ -207,6 +210,11 @@ class DTNA extends UnetAgent {
             reliableLink << new DatagramReq(channel: Physical.CONTROL, to: Address.BROADCAST)
         })
 
+        sweepStorage =  add new TickerBehavior(STORAGE_DURATION, {
+            reliableLink << new DatagramReq(channel: Physical.CONTROL, to: Address.BROADCAST)
+        })
+
+        // FIXME: How to get the last message sent on a link?
         onSendingMessage:
             beacon.reset();
     }
@@ -236,7 +244,8 @@ class DTNA extends UnetAgent {
                 storage.storeMsg(bytes);
                 return new Message(msg, Performative.AGREE);
             }
-        return null;
+            return null;
+        }
     }
 
     int getMTU() {
@@ -264,14 +273,21 @@ class DTNA extends UnetAgent {
             // in multihop I'm not too sure what will happen here:
             // but for now we can just send it to router and see what happens
             def req = new DatagramReq(data: data)
-            router.send(req); // ???
+            router.send(req); // FIXME: ???
+            // now send the DDN:
+            
+            break;
         case DatagramDeliveryNtf:
-            // how do we get the message to which it is mapped?
-            notify << msg;
+            // how do we get the message to which it is mapped? -> inReplyTo
+            String s = msg.inReplyTo;
+            def pduId = datagramMap.get(s);
+            storage.deleteMsg(pduId);
+            // FIXME: Important!
+            // should we resend a DtnNtf using the PduID?
             break;
         case DatagramFailureNtf:
-
-            // same issue and moreover, who do we send these notifs to?
+            // failing is ok, just as long as ttls aren't exceeded
+            // we probably shouldn't need to do anything here
             break;
         }
     }
@@ -279,6 +295,8 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* what do we tell the other node when a TTL expires?
+* Why do DDN's/DFN's have to: set to the sending node?
 * Don't send beacon unless you get an AGREE from the layer
 * Should DeliveryNtfs be broadcast on a topic?
 * Generate a failure when we have TTL exceeded
@@ -286,6 +304,8 @@ class DTNA extends UnetAgent {
     * atm we are bundling it in a DatagramReq and sending it off to Router
 * What is the difference between calling a fxn and using a 1-shot behavior?
 * How can I print messages in the shell?
-
+* why does unetstack rename all the old files?
 ## Resolved
+* how do I subscribe to DDN/DFNs?
+    * they are getting sent to shell, but not to my agent for some reason
 * DatagramFailedNtf/DatagramDeliveryNtf does not give me information about which DatagramReq it is in response to
