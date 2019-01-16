@@ -323,13 +323,13 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
-* Does a receiving node need to store the PDU?
-* Do all PDUs take all the available size 
-* what do we tell the other node when a TTL expires?
+* Do all PDUs take all the available size?
+* Do we need a success PDU when we get link layer results?
+* What do we tell the other node when a TTL expires?
 * Why do DDN's/DFN's have to: set to the sending node?
+* How do I get the last sent message time on a link?
 * Don't send beacon unless you get an AGREE from the layer
 * Should DeliveryNtfs be broadcast on a topic?
-* Generate a failure when we have TTL exceeded
 * What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
     * atm we are bundling it in a DatagramReq and sending it off to Router
 * What is the difference between calling a fxn and using a 1-shot behavior?
@@ -339,3 +339,12 @@ class DTNA extends UnetAgent {
 * how do I subscribe to DDN/DFNs?
     * they are getting sent to shell, but not to my agent for some reason
 * DatagramFailedNtf/DatagramDeliveryNtf does not give me information about which DatagramReq it is in response to
+* Should Beacons be sent to a topic or sent to a Broadcast Address instead?
+* How does Router know whether a DatagramReq has the Router headers or not? We need to do the same thing for DTNAgent
+* How do we differentiate between a message sent to DtnAgent from Link and from Router? A message coming from Router won't have the PDU fields. Maybe we could use getRecipient field to discriminate between these two cases?
+    * Where are the TTLs being decided? Does the Router add the TTLs to the DatagramReq before it sends it to DtnAgent? Or will the DtnAgent fill in the TTLs
+* Do we need a DtnReq/Ntf pair?
+* Should no Ntf and failed Ntf for delivery of a Datagram be handled the same way?
+* When we receive a failed Ntf for delivery, should we switch over to a different link or should we keep retrying on the same link?
+* How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
+* Lost Beacon / disconnection mechanism?
