@@ -304,10 +304,6 @@ class DTNA extends UnetAgent {
                 def failedId = pduData.id;
                 break;
             }
-
-
-
-
             break;
         case DatagramDeliveryNtf:
             // how do we get the message to which it is mapped? -> inReplyTo
