@@ -97,11 +97,12 @@ On a periodic basis (with a TickerBehavior), DtnStorage will scan the available 
 ```
 // This will also be an inner class of DTNA!
 // should this be allowed to make the DatagramReqs or should that be offloaded to the DTNA?
+class DtnMsg {
+    int nextHop;
+    long expiryTime;
+};
+
 class DtnStorage {
-    class DtnMsg {
-        int nextHop;
-        long expiryTime;
-    };
 
     HashMap<long, DtnMsg> db;
     HashMap<String, long> datagramMap;
@@ -141,13 +142,13 @@ class DtnStorage {
 
     void addDbEntry(long id, int nextHop, long expiryTime);
     void removeDbEntry(long id);
-    void deleteExpiredMsgs();
+    DtnMsg[] deleteExpiredMsgs();
     void deleteMsg(int pduId);
     int bufferFreeCapacity();
     String serializePDU(DtnPDU pdu);
     DtnPDU deserializePDU(String s);
     DtnPDU getPdu(int id);
-    Set<DtnMsgs> getNextHopMsgs(int nextHop);
+    DtnMsg[] getNextHopMsgs(int nextHop); // i.e. just the PduIDs
 };
 ```
 
@@ -216,7 +217,15 @@ class DTNA extends UnetAgent {
         })
 
         sweepStorage =  add new TickerBehavior(STORAGE_DURATION, {
-            reliableLink << new DatagramReq(channel: Physical.CONTROL, to: Address.BROADCAST)
+            def deletedPduIDs = storage.deleteExpiredMsgs();
+            // now we need to send failed ntfs for all the deleted msgs
+            for (pduId : deletedPduIDs) {
+                DtnPDU pdu = new pdu(link.MTU());
+                // no data needed for this
+                // nor does it need to be added to the tracking map
+                def bytes = pdu.encode(type: FAILURE_PDU, id: pduId);
+                link << new DatagramReq(data: bytes, to: nextHop);
+            }
         })
 
         // FIXME: How to get the last message sent on a link?
@@ -288,9 +297,11 @@ class DTNA extends UnetAgent {
             case SUCCESS_PDU:
                 //delete our own copy. Though for now we are dealing with link level
                 // so this may not be needed
+                def successfulId = pduData.id;
                 break;
             case FAILURE_PDU:
-                // not sure what to do here. Again, not used for the time being
+                // not sure what to do here. used when a message for my node expires
+                def failedId = pduData.id;
                 break;
             }
 
@@ -316,6 +327,7 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* Does a receiving node need to store the PDU?
 * Do all PDUs take all the available size 
 * what do we tell the other node when a TTL expires?
 * Why do DDN's/DFN's have to: set to the sending node?
