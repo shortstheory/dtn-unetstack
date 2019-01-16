@@ -59,7 +59,11 @@ The ID is a nonce for uniquely identifying each PDU for tracking purposes. It is
 
 ```
 class DtnPDU extends PDU {
-    int pduLength;
+    int pduLength; // FIXME: does this get added to the size of the PDU?
+
+    final int DATA_PDU = 0x01;
+    final int SUCCESS_PDU = 0x02;
+    final int FAILURE_PDU = 0x03;
 
     DtnPDU(int length) {
         pduLength = length;
@@ -67,6 +71,7 @@ class DtnPDU extends PDU {
 
     void format() {
         length(pduLength);
+        uint8("type");
         uint32("id");
         uint32("ttl");
         char("data", pduLength-8);
@@ -269,13 +274,29 @@ class DTNA extends UnetAgent {
             break;
         case DatagramNtf:
             DtnPDU pdu(reliableLink.getMTU());
-            def data = pdu.decode(msg.data);
-            // in multihop I'm not too sure what will happen here:
-            // but for now we can just send it to router and see what happens
-            def req = new DatagramReq(data: data)
-            router.send(req); // FIXME: ???
-            // now send the DDN:
-            
+            def pduData = pdu.decode(msg.data);
+            switch(pduData.type) {
+            case DATA_PDU:
+                //store data pdus
+                // in multihop I'm not too sure what will happen here:
+                // but for now we can just send it to router and see what happens
+                // now send the DDN:
+
+                def req = new DatagramReq(data: data)
+                router.send(req); // FIXME: ???
+                break;
+            case SUCCESS_PDU:
+                //delete our own copy. Though for now we are dealing with link level
+                // so this may not be needed
+                break;
+            case FAILURE_PDU:
+                // not sure what to do here. Again, not used for the time being
+                break;
+            }
+
+
+
+
             break;
         case DatagramDeliveryNtf:
             // how do we get the message to which it is mapped? -> inReplyTo
@@ -295,6 +316,7 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* Do all PDUs take all the available size 
 * what do we tell the other node when a TTL expires?
 * Why do DDN's/DFN's have to: set to the sending node?
 * Don't send beacon unless you get an AGREE from the layer
