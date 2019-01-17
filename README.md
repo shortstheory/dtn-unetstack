@@ -305,6 +305,10 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* Can we create DatagramDeliverNtf/FailedNtf when the DatagramReq comes to DTNA? This is going to make tracking messages very intensive!
+    * for each DReq
+    * we need a new pair of Ntfs
+    * and these need to be tracked as in <Initial DReq ID, Resent DReq ID, NewSuccessNtf, NewFailedNtf>
 * What do we do once the buffer space is full? What message do we send as a response?
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
 * Do all PDUs take all the available size with padding?
