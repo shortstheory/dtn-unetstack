@@ -161,7 +161,6 @@ For now, we trust the Link to take care of notifications and the resending of pa
 
 **Future work:** If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
-**!Needs changes!**
 ```
 class DTNA extends UnetAgent {
     // These can inner classes / part of the same pkg
@@ -315,10 +314,14 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
+* Do we need to broadcast on our own topic?
 * Do all PDUs take all the available size with padding?
 * Do we need a success PDU when we get link layer results?
 * What do we tell the other node when a TTL expires?
     * idea is to create new PDUs for this task
+    * Should we have a separate failed TTL message and a separate general failure message?
+    * but we can probably only send a failure message when a TTL expires
 * Why do DDN's/DFN's have to: set to the sending node?
 * How do I get the last sent message time on a link?
 * Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
