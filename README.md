@@ -317,23 +317,27 @@ class DTNA extends UnetAgent {
 
 ## Open Issues
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
-* Do we need to broadcast on our own topic?
 * Do all PDUs take all the available size with padding?
-* Do we need a success PDU when we get link layer results?
 * What do we tell the other node when a TTL expires?
     * idea is to create new PDUs for this task
     * Should we have a separate failed TTL message and a separate general failure message?
     * but we can probably only send a failure message when a TTL expires
 * Why do DDN's/DFN's have to: set to the sending node?
 * How do I get the last sent message time on a link?
-* Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
 * Don't send beacon unless you get an AGREE from the layer
+* What is the difference between calling a fxn and using a 1-shot behavior?
+* why does unetstack rename all the old files?
+
+## Check
+
+* Do we need to broadcast on our own topic? - YES!!
+* Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
 * Should DeliveryNtfs be broadcast on a topic?
 * What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
     * atm we are bundling it in a DatagramReq and sending it off to Router
-* What is the difference between calling a fxn and using a 1-shot behavior?
 * How can I print messages in the shell?
-* why does unetstack rename all the old files?
+* Do we need a success PDU when we get link layer results?
+
 ## Resolved
 * How do I get/set params for an Agent?
     * create a new enum file and add the properties there for further usage 
