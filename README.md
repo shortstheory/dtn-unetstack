@@ -266,7 +266,8 @@ class DTNA extends UnetAgent {
                 def msgs = getMsgsForNextHop(addr);
                 for (def msg : msgs) {
                     def bytes = deserializeJSON(msg.id);
-                    // TRY REQUEST INSTEAD HERE!!!
+                    def data = dtnPdu.decode(bytes);
+                    data.ttl = msg.expiryTime - currentTime;
                     send new DatagramReq(to: msg.to, data: bytes);
                 }
             }
@@ -313,9 +314,10 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
-* Do all PDUs take all the available size?
+* Do all PDUs take all the available size with padding?
 * Do we need a success PDU when we get link layer results?
 * What do we tell the other node when a TTL expires?
+    * idea is to create new PDUs for this task
 * Why do DDN's/DFN's have to: set to the sending node?
 * How do I get the last sent message time on a link?
 * Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
