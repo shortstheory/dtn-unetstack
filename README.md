@@ -12,6 +12,8 @@ Disruption Tolerant Networks (DTNs) are used in a number of applications where c
 
 In this project, we are attempting to use an adaptation of DTN protocols to improve message delivery in underwater networks using the UnetStack software platform. We are developing the protocol to target certain scenarios in which DTNs can have appreciable improvements in the network performance.
 
+**NOTE: See CompileStatic: http://docs.groovy-lang.org/latest/html/gapi/groovy/transform/CompileStatic.html**
+
 ### Use Cases
 
 * Robotic SWANs are used for collecting marine data through the use of on-board water probes. These SWANs have multiple network interfaces through which data can be transmitted. However, due to inclement weather conditions, it is also possible that no data gets transmitted at all. DTNs can save the day in this case by relaying critical information through nearby nodes which may have better network access. Thanks to the Store-Carry-And-Forward (SCAF) mechanism of DTNs, a SWAN can also wait until network conditions improve to send data.
