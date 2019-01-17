@@ -321,13 +321,14 @@ class DTNA extends UnetAgent {
 * Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
 * Don't send beacon unless you get an AGREE from the layer
 * Should DeliveryNtfs be broadcast on a topic?
-* How do I get/set params for an Agent?
 * What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
     * atm we are bundling it in a DatagramReq and sending it off to Router
 * What is the difference between calling a fxn and using a 1-shot behavior?
 * How can I print messages in the shell?
 * why does unetstack rename all the old files?
 ## Resolved
+* How do I get/set params for an Agent?
+    * create a new enum file and add the properties there for further usage 
 * how do I subscribe to DDN/DFNs?
     * they are getting sent to shell, but not to my agent for some reason
 * DatagramFailedNtf/DatagramDeliveryNtf does not give me information about which DatagramReq it is in response to
