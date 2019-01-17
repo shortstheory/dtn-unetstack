@@ -267,8 +267,9 @@ class DTNA extends UnetAgent {
                 for (def msg : msgs) {
                     def bytes = deserializeJSON(msg.id);
                     def data = dtnPdu.decode(bytes);
+                    // reduce the TTL
                     data.ttl = msg.expiryTime - currentTime;
-                    send new DatagramReq(to: msg.to, data: bytes);
+                    send new DatagramReq(to: msg.to, data: pdu.encode(data));
                 }
             }
             break;
