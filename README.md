@@ -278,38 +278,27 @@ class DTNA extends UnetAgent {
             DtnPDU pdu(reliableLink.getMTU());
             def pduData = pdu.decode(msg.data);
             switch(pduData.type) {
-            case DATA_PDU:
-                //store data pdus
                 // in multihop I'm not too sure what will happen here:
                 // but for now we can just send it to router and see what happens
                 // now send the DDN:
-
-                def req = new DatagramReq(data: data)
-                router.send(req); // FIXME: ???
+            case DatagramNtf:
+                notify << msg;
                 break;
-            case SUCCESS_PDU:
-                //delete our own copy. Though for now we are dealing with link level
-                // so this may not be needed
-                def successfulId = pduData.id;
+            case DatagramDeliveryNtf:
+                // how do we get the message to which it is mapped? -> inReplyTo
+                // the problem is that we are resending the datagram.
+                // so this DDN may not make sense to any subscriber
+                String s = msg.inReplyTo;
+                def pduId = datagramMap.get(s);
+                storage.deleteMsg(pduId);
+                notify << msg;
                 break;
-            case FAILURE_PDU:
-                // not sure what to do here. used when a message for my node expires
-                def failedId = pduData.id;
+            case DatagramFailureNtf:
+                // we don't need to do anything,
+                // but again, which Dgram/might need to manually map this
+                // is it mapped to?
+                notify << msg;
                 break;
-            }
-            break;
-        case DatagramDeliveryNtf:
-            // how do we get the message to which it is mapped? -> inReplyTo
-            String s = msg.inReplyTo;
-            def pduId = datagramMap.get(s);
-            storage.deleteMsg(pduId);
-            // FIXME: Important!
-            // should we resend a DtnNtf using the PduID?
-            break;
-        case DatagramFailureNtf:
-            // failing is ok, just as long as ttls aren't exceeded
-            // we probably shouldn't need to do anything here
-            break;
         }
     }
 };
