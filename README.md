@@ -90,9 +90,7 @@ Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of th
 
 The PDUs themselves will be serialized to JSON for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
-When the DTNA finds a new node, it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. If the PDU is still alive, the PDU's TTL will be reduced by (currentTime - arrivalTime). The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding JSON file is deleted along with it. If the agent receives a notification about delivery failure, it will try retransmitting the PDU periodically while 1) the other node is still "visible" 2) the PDU is Still Alive.
-
-On a periodic basis (with a TickerBehavior), DtnStorage will scan the available files for their TTLs and will delete any files which have expired. The frequency of cleaning old files can probably be adjusted based on the amount of buffer space left on the node. The TTL will come from the application layer.
+When the DTNA finds a new node, it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding JSON file is deleted along with it. If the agent receives a notification about delivery failure, it will try retransmitting the PDU periodically while 1) the other node is still "visible" 2) the PDU is Still Alive.
 
 ```
 // This will also be an inner class of DTNA!
@@ -107,16 +105,8 @@ class DtnStorage {
     HashMap<long, DtnMsg> db;
     HashMap<String, long> datagramMap;
 
-    TickerBehavior tb;
-    DtnStorage(DTNA agent, int duration) {
-        // this may not even be required since we check ttls before sending anyway
-        tb = add new TickerBehavior(agent, duration, {
-            deleteExpiredMsgs();
-        }
-    }
-
-    Set<DtnMsg> getNextHopMsgs(int nextHop) {
-        Set<DtnMsg> msgs;
+    DtnMsg[] getNextHopMsgs(int nextHop) {
+        DtnMsg[] msgs;
         for (def msg : db) {
             if (currentTime > msg.expiryTime) {
                 deleteMsg(msg.id);
@@ -139,16 +129,17 @@ class DtnStorage {
         removeDbEntry(id);
         delete(id);
     }
+    
+    int getBufferSpace();
 
     void addDbEntry(long id, int nextHop, long expiryTime);
     void removeDbEntry(long id);
-    DtnMsg[] deleteExpiredMsgs();
     void deleteMsg(int pduId);
-    int bufferFreeCapacity();
+    DtnMsg[] deleteExpiredMsgs();
+    DtnMsg[] getNextHopMsgs(int nextHop); // i.e. just the PduIDs
     String serializePDU(DtnPDU pdu);
     DtnPDU deserializePDU(String s);
     DtnPDU getPdu(int id);
-    DtnMsg[] getNextHopMsgs(int nextHop); // i.e. just the PduIDs
 };
 ```
 
@@ -166,14 +157,13 @@ This DTNA will receive Datagrams from the Router. This means the DTNA will not b
 
 For now, we trust the Link to take care of notifications and the resending of payloads. The DTNA will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first ReliableLink we can find.
 
-**NOTE:** We only advertise success, not failure! This is because a failed message at one instant may succeed later. But if the TTL of a message expires, we must advertise this.
+**NOTE:** We only advertise success immediately, not failure! This is because a failed message at one instant may succeed later. But if the TTL of a message expires, we must inform the other node of this through a DtnFailurePDU.
 
 **Future work:** If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
 **!Needs changes!**
 ```
 class DTNA extends UnetAgent {
-
     // These can inner classes / part of the same pkg
     DtnStorage storage;
 
@@ -328,8 +318,10 @@ class DTNA extends UnetAgent {
 * What do we tell the other node when a TTL expires?
 * Why do DDN's/DFN's have to: set to the sending node?
 * How do I get the last sent message time on a link?
+* Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
 * Don't send beacon unless you get an AGREE from the layer
 * Should DeliveryNtfs be broadcast on a topic?
+* How do I get/set params for an Agent?
 * What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
     * atm we are bundling it in a DatagramReq and sending it off to Router
 * What is the difference between calling a fxn and using a 1-shot behavior?
