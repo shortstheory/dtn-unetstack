@@ -63,6 +63,7 @@ The ID is a nonce for uniquely identifying each PDU for tracking purposes. It is
 class DtnPDU extends PDU {
     int pduLength; // FIXME: does this get added to the size of the PDU?
 
+    // do we need these fields?
     final int DATA_PDU = 0x01;
     final int SUCCESS_PDU = 0x02;
     final int FAILURE_PDU = 0x03;
@@ -103,7 +104,6 @@ class DtnMsg {
 };
 
 class DtnStorage {
-
     HashMap<long, DtnMsg> db;
     HashMap<String, long> datagramMap;
 
@@ -131,7 +131,7 @@ class DtnStorage {
         removeDbEntry(id);
         delete(id);
     }
-    
+
     int getBufferSpace();
 
     void addDbEntry(long id, int nextHop, long expiryTime);
@@ -275,36 +275,37 @@ class DTNA extends UnetAgent {
             }
             break;
         case DatagramNtf:
-            DtnPDU pdu(reliableLink.getMTU());
-            def pduData = pdu.decode(msg.data);
-            switch(pduData.type) {
-                // in multihop I'm not too sure what will happen here:
-                // but for now we can just send it to router and see what happens
-                // now send the DDN:
-            case DatagramNtf:
+            // if buffer space is low, then we can't accept a new DGram for SCAF
+            // but the Link thinks it has done its job properly!
+            // resolve with DTN PDUs?!
+            if (getBufferSpace() != LOW) {
+                DtnPDU pdu(reliableLink.getMTU());
+                def pduData = pdu.decode(msg.data);
                 notify << msg;
-                break;
-            case DatagramDeliveryNtf:
-                // how do we get the message to which it is mapped? -> inReplyTo
-                // the problem is that we are resending the datagram.
-                // so this DDN may not make sense to any subscriber
-                String s = msg.inReplyTo;
-                def pduId = datagramMap.get(s);
-                storage.deleteMsg(pduId);
-                notify << msg;
-                break;
-            case DatagramFailureNtf:
-                // we don't need to do anything,
-                // but again, which Dgram/might need to manually map this
-                // is it mapped to?
-                notify << msg;
-                break;
+            }
+            break;
+        case DatagramDeliveryNtf:
+            // how do we get the message to which it is mapped? -> inReplyTo
+            // the problem is that we are resending the datagram.
+            // so this DDN may not make sense to any subscriber
+            String s = msg.inReplyTo;
+            def pduId = datagramMap.get(s);
+            storage.deleteMsg(pduId);
+            notify << msg;
+            break;
+        case DatagramFailureNtf:
+            // we don't need to do anything,
+            // but again, which Dgram/might need to manually map this
+            // is it mapped to?
+            notify << msg;
+            break;
         }
     }
 };
 ```
 
 ## Open Issues
+* What do we do once the buffer space is full? What message do we send as a response?
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
 * Do all PDUs take all the available size with padding?
 * What do we tell the other node when a TTL expires?
