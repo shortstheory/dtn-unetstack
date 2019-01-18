@@ -177,6 +177,7 @@ class DTNA extends UnetAgent {
     TickerBehavior beacon;
     TickerBehavior sweepStorage;
     int addr;
+    def linkLastSeen;
     final int BEACON_DURATION = 100000; // should this be a param?
     final int STORAGE_DURATION = 100000;
 
@@ -204,7 +205,10 @@ class DTNA extends UnetAgent {
         })
 
         beacon = add new TickerBehavior(BEACON_DURATION, {
-            reliableLink << new DatagramReq(channel: Physical.CONTROL, to: Address.BROADCAST)
+            if (currentTime - linkLastSeen >= BEACON_DURATION) {
+                reliableLink << new DatagramReq(channel: Physical.CONTROL, to: Address.BROADCAST)
+                linkLastSeen = currentTime;
+            }
         })
 
         sweepStorage =  add new TickerBehavior(STORAGE_DURATION, {
@@ -283,6 +287,7 @@ class DTNA extends UnetAgent {
                 def pduData = pdu.decode(msg.data);
                 notify << msg;
             }
+            linkLastSeen = currentTime
             break;
         case DatagramDeliveryNtf:
             // how do we get the message to which it is mapped? -> inReplyTo
@@ -310,19 +315,22 @@ class DTNA extends UnetAgent {
     * we need a new pair of Ntfs
     * and these need to be tracked as in <Initial DReq ID, Resent DReq ID, NewSuccessNtf, NewFailedNtf>
 * What do we do once the buffer space is full? What message do we send as a response?
+    * The link will say OK, but the DTNA will refuse the message, spurious ACK!!
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
+* What does PDU.decode return if the bytes we get are not decodeable?
 * Do all PDUs take all the available size with padding?
 * What do we tell the other node when a TTL expires?
     * idea is to create new PDUs for this task
     * Should we have a separate failed TTL message and a separate general failure message?
     * but we can probably only send a failure message when a TTL expires
 * Why do DDN's/DFN's have to: set to the sending node?
-* How do I get the last sent message time on a link?
 * Don't send beacon unless you get an AGREE from the layer
 * What is the difference between calling a fxn and using a 1-shot behavior?
 * why does unetstack rename all the old files?
 
 ## Check
+* How do I get the last sent message time on a link?
+    * just subscribe to it 
 
 * Do we need to broadcast on our own topic? - YES!!
 * Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
