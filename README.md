@@ -91,9 +91,9 @@ Each PDU contains a TTL which specifies the time until its expiry. DtnStorage ca
 
 Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time.
 
-The PDUs themselves will be serialized to JSON for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
+The PDUs themselves will be serialized to bytes for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
-When the DTNA finds a new node, it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding JSON file is deleted along with it. If the agent receives a notification about delivery failure, it will try retransmitting the PDU periodically while 1) the other node is still "visible" 2) the PDU is Still Alive.
+When the DTNA finds a new node (either through a Beacon or a snooped message), it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding PDU file is deleted along with it. If the agent receives a notification about delivery failure, <what will it do?>
 
 ```
 // This will also be an inner class of DTNA!
@@ -282,10 +282,12 @@ class DTNA extends UnetAgent {
             // if buffer space is low, then we can't accept a new DGram for SCAF
             // but the Link thinks it has done its job properly!
             // resolve with DTN PDUs?!
-            if (getBufferSpace() != LOW) {
-                DtnPDU pdu(reliableLink.getMTU());
-                def pduData = pdu.decode(msg.data);
-                notify << msg;
+            if (msg.getProtocol() == DTN_PROTOCOL) {
+                if (getBufferSpace() != LOW) {
+                    DtnPDU pdu(reliableLink.getMTU());
+                    def pduData = pdu.decode(msg.data);
+                    notify << msg;
+                }
             }
             linkLastSeen = currentTime
             break;
@@ -310,10 +312,15 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* DatagramReq docu: https://unetstack.net/javadoc/org/arl/unet/DatagramReq.html getTTL()
+* Create a DTN protocol type for DatagramReqs which are meant for me!!
+* Should we retransmit DDNs/DFNs?
 * Can we create DatagramDeliverNtf/FailedNtf when the DatagramReq comes to DTNA? This is going to make tracking messages very intensive!
     * for each DReq
     * we need a new pair of Ntfs
-    * and these need to be tracked as in <Initial DReq ID, Resent DReq ID, NewSuccessNtf, NewFailedNtf>
+    * <s>and these need to be tracked as in <Initial DReq ID, Resent DReq ID, NewSuccessNtf, NewFailedNtf> </s>
+        * We could go with storing <PDU ID, Next-Hop, Expiry Time, DDN, DFN>. On receipt of success/failed PDUs from DTNA, we can send the correct Ntf on our notification topic.
+        * Then we won't need to do the messy work of maintaining MessageID, PDU ID
 * What do we do once the buffer space is full? What message do we send as a response?
     * The link will say OK, but the DTNA will refuse the message, spurious ACK!!
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
@@ -321,28 +328,24 @@ class DTNA extends UnetAgent {
 * What does PDU.decode return if the bytes we get are not decodeable?
 * Do all PDUs take all the available size with padding?
 * What do we tell the other node when a TTL expires?
-    * idea is to create new PDUs for this task
-    * Should we have a separate failed TTL message and a separate general failure message?
-    * but we can probably only send a failure message when a TTL expires
-* Why do DDN's/DFN's have to: set to the sending node?
-* Don't send beacon unless you get an AGREE from the layer
+* Why do DDN's/DFN's have "to:" set to the sending node?
 * Why would i need fillers in my PDUs?
 * What is the difference between calling a fxn and using a 1-shot behavior?
-* why does unetstack rename all the old files?
 
 ## Check
 * How do I get the last sent message time on a link?
     * just subscribe to it 
-
 * Do we need to broadcast on our own topic? - YES!!
 * Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
-* Should DeliveryNtfs be broadcast on a topic?
+* Should DeliveryNtfs be broadcast on a topic? - yes!
 * What do we do once we receive a DatagramNtf? Do we send it over to router or store it in SCAF? Will Router pass the message up to the App?
     * atm we are bundling it in a DatagramReq and sending it off to Router
-* How can I print messages in the shell?
-* Do we need a success PDU when we get link layer results?
+* How can I print messages in the shell? - just the shell a message
+* Do we need a success PDU when we get link layer results? - maybe?!
 
 ## Resolved
+* why does unetstack rename all the old files?
+* Don't send beacon unless you get an AGREE from the layer
 * How do I get/set params for an Agent?
     * create a new enum file and add the properties there for further usage 
 * how do I subscribe to DDN/DFNs?
@@ -357,3 +360,9 @@ class DTNA extends UnetAgent {
 * When we receive a failed Ntf for delivery, should we switch over to a different link or should we keep retrying on the same link?
 * How do we inform the other nodes about the ReliableLinks we have available? Even if an RL exists on the node, it may not actually be operational for sending messages (e.g. two AUVs trying to talk over a WiFi radio underwater). So we need to have some way of testing the Link between the nodes before advertising the Link.
 * Lost Beacon / disconnection mechanism?
+
+// Dhananjai's project: Implemented two reactive routing protocols and a non-persistent method-based CSMA MAC protocol for a small shallow-water ad hoc network on UnetStack.
+
+Created an underwater network-based version of a mobile ad hoc network-based routing scheme called Ad-hoc On-demand Distance Vector Routing.
+
+Compared the routing protocols by analyzing the effect of varying offered load, network size and the number of route-discovery re-transmissions on packet delivery ratio and control overhead
