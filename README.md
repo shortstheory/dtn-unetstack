@@ -317,6 +317,7 @@ class DTNA extends UnetAgent {
 * What do we do once the buffer space is full? What message do we send as a response?
     * The link will say OK, but the DTNA will refuse the message, spurious ACK!!
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
+* How do I run groovy in my IDE?
 * What does PDU.decode return if the bytes we get are not decodeable?
 * Do all PDUs take all the available size with padding?
 * What do we tell the other node when a TTL expires?
@@ -325,6 +326,7 @@ class DTNA extends UnetAgent {
     * but we can probably only send a failure message when a TTL expires
 * Why do DDN's/DFN's have to: set to the sending node?
 * Don't send beacon unless you get an AGREE from the layer
+* Why would i need fillers in my PDUs?
 * What is the difference between calling a fxn and using a 1-shot behavior?
 * why does unetstack rename all the old files?
 
