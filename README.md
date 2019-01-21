@@ -105,12 +105,13 @@ As we are exclusively using RLs, we are *guaranteed* to get a notification about
 class DtnMsg {
     int nextHop;
     long expiryTime;
+    String originalMessageID;
 };
 
 class DtnStorage {
     // db is PduID and DtnMsg
     HashMap<long, DtnMsg> db;
-    // datagramMap maps messageID to PduID
+    // datagramMap maps the New (resent) DR messageID to PduID
     HashMap<String, long> datagramMap;
 
     DtnMsg[] getNextHopMsgs(int nextHop) {
@@ -177,8 +178,6 @@ class DTNA extends UnetAgent {
     AgentID reliableLink;
     AgentID router;
     AgentID notify;
-
-    HashMap<String, long> datagramMap;
 
     TickerBehavior beacon;
     TickerBehavior sweepStorage;
@@ -302,7 +301,7 @@ class DTNA extends UnetAgent {
             // the problem is that we are resending the datagram.
             // so this DDN may not make sense to any subscriber
             String s = msg.inReplyTo;
-            def pduId = datagramMap.get(s);
+            def pduId = storage.datagramMap.get(s); // change this to a proper getter
             storage.deleteMsg(pduId);
             notify << msg;
             break;
