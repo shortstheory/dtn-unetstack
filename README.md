@@ -334,12 +334,20 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
-* Who actually listens to the Ntfs and what action do they take?
+* What should agents do on listening to the Ntfs and what action should they take?
 * OutputPDUs also have a length field which must be filled
 * DatagramReq docu: https://unetstack.net/javadoc/org/arl/unet/DatagramReq.html getTTL()
-* Create a DTN protocol type for DatagramReqs which are meant for me!!
-* Should we retransmit DDNs/DFNs?
 * Compile static invalidates things like 1.second
+* Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
+* How do I run groovy in my IDE?
+* What do we tell the other node when a TTL expires?
+* Why do DDN's/DFN's have "to:" set to the sending node?
+* What is the difference between calling a fxn and using a 1-shot behavior?
+* Why would i need fillers in my PDUs?
+
+## Check
+* What does PDU.decode return if the bytes we get are not decodeable?
+* Do all PDUs take all the available size with padding?
 * Can we create DatagramDeliverNtf/FailedNtf when the DatagramReq comes to DTNA? This is going to make tracking messages very intensive!
     * for each DReq
     * we need a new pair of Ntfs
@@ -348,16 +356,8 @@ class DTNA extends UnetAgent {
         * Then we won't need to do the messy work of maintaining MessageID, PDU ID
 * What do we do once the buffer space is full? What message do we send as a response?
     * The link will say OK, but the DTNA will refuse the message, spurious ACK!!
-* Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
-* How do I run groovy in my IDE?
-* What does PDU.decode return if the bytes we get are not decodeable?
-* Do all PDUs take all the available size with padding?
-* What do we tell the other node when a TTL expires?
-* Why do DDN's/DFN's have "to:" set to the sending node?
-* Why would i need fillers in my PDUs?
-* What is the difference between calling a fxn and using a 1-shot behavior?
-
-## Check
+* Should we retransmit DDNs/DFNs?
+* Create a DTN protocol type for DatagramReqs which are meant for me!!
 * How do I get the last sent message time on a link?
     * just subscribe to it
 * Do we need to broadcast on our own topic? - YES!!
