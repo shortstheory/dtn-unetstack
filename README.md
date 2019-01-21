@@ -128,10 +128,12 @@ class DtnStorage {
         return msgs;
     }
 
-    void savePdu(DtnPDU pdu) {
+    void savePdu(DatagramReq req) {
+        def nonce = random(32);
+        def pdu = new DtnPDU(req.data, nonce, ttl); // will change syntax
         String s = serializePDU(pdu);
         save(s);
-        addDbEntry(pdu.get(id), pdu.get(nextHop), pdu.get(ttl)+currentTime);
+        addDbEntry(nonce, req.get(nextHop), req.getTtl()+currentTime, req.messageID);
     }
 
     void deleteMsg(int pduId) {
@@ -141,11 +143,11 @@ class DtnStorage {
 
     int getBufferSpace();
 
-    void addDbEntry(long id, int nextHop, long expiryTime);
-    void removeDbEntry(long id);
-    void deleteMsg(int pduId);
+    void addDbEntry(long id, int nextHop, long expiryTime, String originalMessageID);
+    void removeDbEntry(long pduId);
+    void deleteMsg(long pduId);
     DtnMsg[] deleteExpiredMsgs();
-    DtnMsg[] getNextHopMsgs(int nextHop); // i.e. just the PduIDs
+    DtnMsg[] getNextHopMsgs(int nextHop);
     String serializePDU(DtnPDU pdu);
     DtnPDU deserializePDU(String s);
     DtnPDU getPdu(int id);
