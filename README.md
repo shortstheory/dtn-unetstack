@@ -49,7 +49,7 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 The Beacon is a part of the DTNA. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending an empty DatagramReq with the Recipient set to the DTNA.
 
-Beacons are not explicitly required to advertise the existence of links. The DTNA will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link.
+Beacons are not explicitly required to advertise the existence of links. The DTNA will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link for that interval.
 
 #### DtnPdu
 
@@ -64,9 +64,9 @@ class DtnPDU extends PDU {
     int pduLength; // FIXME: does this get added to the size of the PDU?
 
     // do we need these fields?
-    final int DATA_PDU = 0x01;
-    final int SUCCESS_PDU = 0x02;
-    final int FAILURE_PDU = 0x03;
+   // final int DATA_PDU = 0x01;
+   // final int SUCCESS_PDU = 0x02;
+   // final int FAILURE_PDU = 0x03;
 
     DtnPDU(int length) {
         pduLength = length;
@@ -89,11 +89,15 @@ The DtnStorage class will handle the SCAF mechanism. It will track PDUs, manage 
 
 Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, and the Expiry Time based on the node's own clock. This database will be stored on the persistent storage.
 
-Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time.
+Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time. One disadvantage of this approach is that the in-memory DB could be affected by power failure. To fix this, we will back the DB on the filesystem.
 
 The PDUs themselves will be serialized to bytes for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
-When the DTNA finds a new node (either through a Beacon or a snooped message), it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding PDU file is deleted along with it. If the agent receives a notification about delivery failure, <what will it do?>
+When the DTNA finds a new node (either through a Beacon or a snooped message), it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks (RLs).
+
+As we are exclusively using RLs, we are *guaranteed* to get a notification about the result of the delivery. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding PDU file is deleted along with it. If the agent receives a notification about delivery failure, <what will it do?>
+
+**Edge Case:** If the receiving node is out of buffer space, we can lose a message entirely! The receiving node will not be able to store the message due to insufficient buffer space, but the RL will report successful delivery, causing the sending node to delete the message from its buffer. This might be addressed in the future if it becomes a significant problem.
 
 ```
 // This will also be an inner class of DTNA!
@@ -104,7 +108,9 @@ class DtnMsg {
 };
 
 class DtnStorage {
+    // db is PduID and DtnMsg
     HashMap<long, DtnMsg> db;
+    // datagramMap maps messageID to PduID
     HashMap<String, long> datagramMap;
 
     DtnMsg[] getNextHopMsgs(int nextHop) {
@@ -312,9 +318,11 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* OutputPDUs also have a length field which must be filled
 * DatagramReq docu: https://unetstack.net/javadoc/org/arl/unet/DatagramReq.html getTTL()
 * Create a DTN protocol type for DatagramReqs which are meant for me!!
 * Should we retransmit DDNs/DFNs?
+* Compile static invalidates things like 1.second
 * Can we create DatagramDeliverNtf/FailedNtf when the DatagramReq comes to DTNA? This is going to make tracking messages very intensive!
     * for each DReq
     * we need a new pair of Ntfs
@@ -334,7 +342,7 @@ class DTNA extends UnetAgent {
 
 ## Check
 * How do I get the last sent message time on a link?
-    * just subscribe to it 
+    * just subscribe to it
 * Do we need to broadcast on our own topic? - YES!!
 * Do we need to serialize PDUs as JSON? Can't we just store the bytes of the PDU?
 * Should DeliveryNtfs be broadcast on a topic? - yes!
