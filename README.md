@@ -168,7 +168,7 @@ This DTNA will receive Datagrams from the Router. This means the DTNA will not b
 
 For now, we trust the Link to take care of notifications and the resending of payloads. The DTNA will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first ReliableLink we can find.
 
-**NOTE:** We only advertise success immediately, not failure! This is because a failed message at one instant may succeed later. But if the TTL of a message expires, we must inform the other node of this through a DtnFailurePDU.
+**NOTE:** We only advertise success immediately, not failure! This is because a failed message at one instant may succeed later. On a message which has expired, we just send a DFN on DTNA's topic.
 
 **Future work:** If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
@@ -180,11 +180,12 @@ class DTNA extends UnetAgent {
     AgentID reliableLink;
     AgentID router;
     AgentID notify;
+    AgentID nodeInfo;
 
     TickerBehavior beacon;
     TickerBehavior sweepStorage;
     int addr;
-    def linkLastSeen;
+    long linkLastSeen;
     final int BEACON_DURATION = 100000; // should this be a param?
     final int STORAGE_DURATION = 100000;
 
@@ -198,15 +199,16 @@ class DTNA extends UnetAgent {
 
         // I'm not really sure if this is required
         phy = agentForService Services.PHYSICAL
-        subscribe(phy)
-        subscribe(topic(phy, Physical.SNOOP))
+        nodeInfo = agentForService Services.NODE_INFO
         router = agentForService Services.ROUTING
 
+        subscribe(phy)
+        subscribe(topic(phy, Physical.SNOOP))
         notify = topic()
 
-        def nodeInfo = agentForService Services.NODE_INFO
         addr = get(nodeInfo, NodeInfoParam.address)
 
+        // should this be made a function?
         add new OneShotBehavior({
             getReliableLink();
         })
@@ -219,22 +221,26 @@ class DTNA extends UnetAgent {
         })
 
         sweepStorage =  add new TickerBehavior(STORAGE_DURATION, {
-            def deletedPduIDs = storage.deleteExpiredMsgs();
+            def deletedDtnMsgs = storage.deleteExpiredMsgs();
             // now we need to send failed ntfs for all the deleted msgs
-            for (pduId : deletedPduIDs) {
-                DtnPDU pdu = new pdu(link.MTU());
-                // no data needed for this
-                // nor does it need to be added to the tracking map
-                def bytes = pdu.encode(type: FAILURE_PDU, id: pduId);
-                link << new DatagramReq(data: bytes, to: nextHop);
+            for (dtnMsg : deletedPduIDs) {
+                // just generate the Ntfs and broadcast them
+                notify.send(createNtf(dtnMsg, FAILURE));
             }
         })
-
-        // FIXME: How to get the last message sent on a link?
-        onSendingMessage:
-            beacon.reset();
     }
 
+    Message createNtf(DtnMsg msg, int result) {
+        Message ntf;
+        if (result == SUCCESS) {
+            ntf = new DatagramDeliveryNtf(to: msg.nextHop, inReplyTo: msg.getMessageID())
+        } else if (result == FAILURE) {
+            ntf = new DatagramFailureNtf(to: msg.nextHop, inReplyTo: msg.getMessageID())
+        }
+        return ntf;
+    }
+
+    // adapt this to single link
     void getReliableLink() {
         reliableLinks.clear();
         def links = agentsForService(Services.LINK);
@@ -242,7 +248,9 @@ class DTNA extends UnetAgent {
             CapabilityReq req = new CapabilityReq(link, DatagramCapability.RELIABILITY);
             Message rsp = request(req, 500); // this could take a while if we have a lot of links
             if (rsp.getPerformative() == Performative.CONFIRM) {
+                // NOTE: need to subscribe to the PHY for each link as well!
                 subscribe(link);
+                // subscribe(phy-for-this-link)
                 reliableLink = link;
                 break;
             }
@@ -254,10 +262,10 @@ class DTNA extends UnetAgent {
         // FIXME: Need to distinguish DatagramReqs based on the origin
         case DatagramReq:
             if (msg.getReliability() || msg.getTTL() == NaN || storage.bufferFull()) {
+                // do we need to create a DFN for this?
                 return new Message(msg, Performative.REFUSE);
             } else {
-                def bytes = msg.getData();
-                storage.storeMsg(bytes);
+                storage.savePdu(msg);
                 return new Message(msg, Performative.AGREE);
             }
             return null;
@@ -281,7 +289,7 @@ class DTNA extends UnetAgent {
                     def data = dtnPdu.decode(bytes);
                     // reduce the TTL
                     data.ttl = msg.expiryTime - currentTime;
-                    send new DatagramReq(to: msg.to, data: pdu.encode(data));
+                    reliableLink.send(new DatagramReq(to: msg.to, data: pdu.encode(data)));
                 }
             }
             break;
@@ -289,11 +297,15 @@ class DTNA extends UnetAgent {
             // if buffer space is low, then we can't accept a new DGram for SCAF
             // but the Link thinks it has done its job properly!
             // resolve with DTN PDUs?!
+
+            // NOTE: what should we do with other link messages?
             if (msg.getProtocol() == DTN_PROTOCOL) {
                 if (getBufferSpace() != LOW) {
                     DtnPDU pdu(reliableLink.getMTU());
                     def pduData = pdu.decode(msg.data);
                     notify << msg;
+                } else {
+                    notify.send(createMessage(dtnMsg, FAILURE));
                 }
             }
             linkLastSeen = currentTime
@@ -302,16 +314,19 @@ class DTNA extends UnetAgent {
             // how do we get the message to which it is mapped? -> inReplyTo
             // the problem is that we are resending the datagram.
             // so this DDN may not make sense to any subscriber
-            String s = msg.inReplyTo;
             def pduId = storage.datagramMap.get(s); // change this to a proper getter
+            def dtnMsg = storage.getDtnMsg(pduId);
             storage.deleteMsg(pduId);
-            notify << msg;
+            notify.send(createNtf(dtnMsg, SUCCESS));
             break;
         case DatagramFailureNtf:
             // we don't need to do anything,
             // but again, which Dgram/might need to manually map this
             // is it mapped to?
-            notify << msg;
+            def pduId = storage.datagramMap.get(s); // change this to a proper getter
+            def dtnMsg = storage.getDtnMsg(pduId);
+            storage.deleteMsg(pduId);
+            notify.send(createNtf(dtnMsg, FAILURE));
             break;
         }
     }
@@ -319,6 +334,7 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* Who actually listens to the Ntfs and what action do they take?
 * OutputPDUs also have a length field which must be filled
 * DatagramReq docu: https://unetstack.net/javadoc/org/arl/unet/DatagramReq.html getTTL()
 * Create a DTN protocol type for DatagramReqs which are meant for me!!
