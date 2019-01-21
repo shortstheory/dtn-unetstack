@@ -334,6 +334,7 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
+* How will multi-hop ntfs be sent?
 * What should agents do on listening to the Ntfs and what action should they take?
 * OutputPDUs also have a length field which must be filled
 * DatagramReq docu: https://unetstack.net/javadoc/org/arl/unet/DatagramReq.html getTTL()
