@@ -341,12 +341,12 @@ class DTNA extends UnetAgent {
 * Compile static invalidates things like 1.second
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
 * How do I run groovy in my IDE?
-* What do we tell the other node when a TTL expires?
 * Why do DDN's/DFN's have "to:" set to the sending node?
 * What is the difference between calling a fxn and using a 1-shot behavior?
 * Why would i need fillers in my PDUs?
 
 ## Check
+* What do we tell the other node when a TTL expires?
 * What does PDU.decode return if the bytes we get are not decodeable?
 * Do all PDUs take all the available size with padding?
 * Can we create DatagramDeliverNtf/FailedNtf when the DatagramReq comes to DTNA? This is going to make tracking messages very intensive!
