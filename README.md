@@ -27,12 +27,12 @@ We are relaxing some of the requirements for DTNs for the first iteration of thi
 * A **Beacon**, to allow nodes to advertise their existence and find other nodes.
 * A **Storage** mechanism to allow for SCAF. This should also delete files which have been successfully acknowledged or those which have expired TTLs.
 * A **PDU** (which will be wrapped in the DatagramReq) for storing DTN metadata such as TTL.
-* A **DTNA** (DTN Agent) which can handle Datagram requests from other agents and send essential notifications about the relay of PDUs.
+* A **DTNLink** (DTN Agent) which can handle Datagram requests from other agents and send essential notifications about the relay of PDUs.
 
 Goals which will not be covered by the first iteration but which may be covered in the future are:
 
 * Dedicated ACK schemes. Though this is very important in DTNs, we are only focussing on single hop routing and we only need to make sure our message has reached the next hop node. This will be covered by using ReliableLinks for single hops.
-* The DTNA should be able to talk over multiple ReliableLinks and should have the capability of choosing the best Link for a certain application.
+* The DTNLink should be able to talk over multiple ReliableLinks and should have the capability of choosing the best Link for a certain application.
 * Multihop routing of PDUs.
 * Dynamic routing protocols.
 * Fragmentation and reassembly of large PDUs.
@@ -45,11 +45,11 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 ### Classes
 
-#### DtnBeacon
+#### Beacon
 
-The Beacon is a part of the DTNA. Its task is to periodically send a message to advertise the existence of a node to all neighbors by sending an empty DatagramReq with the Recipient set to the DTNA.
+The Beacon is a part of the DTNLink. It is a WakerBehavior, whose task is to periodically send a message to advertise the existence of a node to all neighbors by sending an empty DatagramReq on the Link with on the Unet broadcast address.
 
-Beacons are not explicitly required to advertise the existence of links. The DTNA will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link for that interval.
+Beacons are not explicitly required to advertise the existence of links. The DTNLink will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link for that interval.
 
 #### DtnPdu
 
@@ -93,15 +93,15 @@ Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of th
 
 The PDUs themselves will be serialized to bytes for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
-When the DTNA finds a new node (either through a Beacon or a snooped message), it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks (RLs).
+When the DTNLink finds a new node (either through a Beacon or a snooped message), it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks (RLs).
 
 As we are exclusively using RLs, we are *guaranteed* to get a notification about the result of the delivery. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding PDU file is deleted along with it. If the agent receives a notification about delivery failure, <what will it do?>
 
 **Edge Case:** If the receiving node is out of buffer space, we can lose a message entirely! The receiving node will not be able to store the message due to insufficient buffer space, but the RL will report successful delivery, causing the sending node to delete the message from its buffer. This might be addressed in the future if it becomes a significant problem.
 
 ```
-// This will also be an inner class of DTNA!
-// should this be allowed to make the DatagramReqs or should that be offloaded to the DTNA?
+// This will also be an inner class of DTNLink!
+// should this be allowed to make the DatagramReqs or should that be offloaded to the DTNLink?
 class DtnMsg {
     int nextHop;
     long expiryTime;
@@ -154,26 +154,26 @@ class DtnStorage {
 };
 ```
 
-#### DTNA
+#### DTNLink
 
-The DTNA is a UnetAgent which contains instances of the above classes. The DTNA will handle the sending of messages, sending and receiving of notifications, and logic for selecting the ReliableLink to be used.
+The DTNLink is a UnetAgent which contains instances of the above classes. The DTNLink will handle the sending of messages, sending and receiving of notifications, and logic for selecting the ReliableLink to be used.
 
-The DTNA will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
+The DTNLink will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
 
-This DTNA will receive Datagrams from the Router. This means the DTNA will not be responsible for routing messages for the time being. It will also receive messages from Reliable links which need to be passed up to the router. The below block diagram illustrates this:
+This DTNLink will receive Datagrams from the Router. This means the DTNLink will not be responsible for routing messages for the time being. It will also receive messages from Reliable links which need to be passed up to the router. The below block diagram illustrates this:
 
 ![](DTNAgent.png)
 
 (Yellow == DatagramNtf, Purple == DatagramReq)
 
-For now, we trust the Link to take care of notifications and the resending of payloads. The DTNA will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first ReliableLink we can find.
+For now, we trust the Link to take care of notifications and the resending of payloads. The DTNLink will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first ReliableLink we can find.
 
-**NOTE:** We only advertise success immediately, not failure! This is because a failed message at one instant may succeed later. On a message which has expired, we just send a DFN on DTNA's topic.
+**NOTE:** We only advertise success immediately, not failure! This is because a failed message at one instant may succeed later. On a message which has expired, we just send a DFN on DTNLink's topic.
 
 **Future work:** If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
 
 ```
-class DTNA extends UnetAgent {
+class DTNLink extends UnetAgent {
     // These can inner classes / part of the same pkg
     DtnStorage storage;
 
@@ -349,14 +349,14 @@ class DTNA extends UnetAgent {
 * What do we tell the other node when a TTL expires?
 * What does PDU.decode return if the bytes we get are not decodeable?
 * Do all PDUs take all the available size with padding?
-* Can we create DatagramDeliverNtf/FailedNtf when the DatagramReq comes to DTNA? This is going to make tracking messages very intensive!
+* Can we create DatagramDeliverNtf/FailedNtf when the DatagramReq comes to DTNLink? This is going to make tracking messages very intensive!
     * for each DReq
     * we need a new pair of Ntfs
     * <s>and these need to be tracked as in <Initial DReq ID, Resent DReq ID, NewSuccessNtf, NewFailedNtf> </s>
-        * We could go with storing <PDU ID, Next-Hop, Expiry Time, DDN, DFN>. On receipt of success/failed PDUs from DTNA, we can send the correct Ntf on our notification topic.
+        * We could go with storing <PDU ID, Next-Hop, Expiry Time, DDN, DFN>. On receipt of success/failed PDUs from DTNLink, we can send the correct Ntf on our notification topic.
         * Then we won't need to do the messy work of maintaining MessageID, PDU ID
 * What do we do once the buffer space is full? What message do we send as a response?
-    * The link will say OK, but the DTNA will refuse the message, spurious ACK!!
+    * The link will say OK, but the DTNLink will refuse the message, spurious ACK!!
 * Should we retransmit DDNs/DFNs?
 * Create a DTN protocol type for DatagramReqs which are meant for me!!
 * How do I get the last sent message time on a link?
