@@ -334,18 +334,18 @@ class DTNA extends UnetAgent {
 ```
 
 ## Open Issues
-* How will multi-hop ntfs be sent?
-* What should agents do on listening to the Ntfs and what action should they take?
-* OutputPDUs also have a length field which must be filled
-* DatagramReq docu: https://unetstack.net/javadoc/org/arl/unet/DatagramReq.html getTTL()
-* Compile static invalidates things like 1.second
-* Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
-* How do I run groovy in my IDE?
-* Why do DDN's/DFN's have "to:" set to the sending node?
-* What is the difference between calling a fxn and using a 1-shot behavior?
+* DuplicateNtfs from listening to both RxFrameNtfs/DatagramNtfs on phy/link
+* How to pass TTLs for multi-hop?
 * Why would i need fillers in my PDUs?
 
 ## Check
+* Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
+* What is the difference between calling a fxn and using a 1-shot behavior? - 1 shot can be scheduled in async
+* How do I run groovy in my IDE?
+* Why do DDN's/DFN's have "to:" set to the sending node?
+* What should agents do on listening to the Ntfs and what action should they take?
+* OutputPDUs also have a length field which must be filled
+* How will multi-hop ntfs be sent?
 * What do we tell the other node when a TTL expires?
 * What does PDU.decode return if the bytes we get are not decodeable?
 * Do all PDUs take all the available size with padding?
@@ -370,6 +370,8 @@ class DTNA extends UnetAgent {
 * Do we need a success PDU when we get link layer results? - maybe?!
 
 ## Resolved
+* DatagramReq docu: https://unetstack.net/javadoc/org/arl/unet/DatagramReq.html getTTL()
+* Compile static invalidates things like 1.second
 * why does unetstack rename all the old files?
 * Don't send beacon unless you get an AGREE from the layer
 * How do I get/set params for an Agent?
