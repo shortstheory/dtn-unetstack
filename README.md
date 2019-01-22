@@ -57,16 +57,16 @@ The PDU will hold the data to be transmitted along with the DTN metadata. We nee
 
 Here, the TTL represents the number of seconds left before the PDU expires. Once the PDU has expired, we delete it from persistent storage.
 
-The ID is a nonce for uniquely identifying each PDU for tracking purposes. It is generated on the node which creates the PDU.
+The ID is a nonce for uniquely identifying each PDU for tracking purposes. It is generated on the node which creates the PDU. This PDU ID will be more useful once we extend the DTNLink to support Transport for multi-hop reliability.
 
 ```
 class DtnPDU extends PDU {
     int pduLength; // FIXME: does this get added to the size of the PDU?
 
     // do we need these fields?
-   // final int DATA_PDU = 0x01;
-   // final int SUCCESS_PDU = 0x02;
-   // final int FAILURE_PDU = 0x03;
+    // final int DATA_PDU = 0x01;
+    // final int SUCCESS_PDU = 0x02;
+    // final int FAILURE_PDU = 0x03;
 
     DtnPDU(int length) {
         pduLength = length;
@@ -91,11 +91,11 @@ Each PDU contains a TTL which specifies the time until its expiry. DtnStorage ca
 
 Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time. One disadvantage of this approach is that the in-memory DB could be affected by power failure. To fix this, we will back the DB on the filesystem.
 
-The PDUs themselves will be serialized to bytes for storage on the node using the [Gson](https://github.com/google/gson) library. The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
+The PDUs themselves will be serialized to bytes for storage on the node using the [Gson](https://github.com/google/gson) library (we can store the bytes directly, this may not actually be needed, unless I choose to add the metadata with the PDU, which might be a good idea). The filename of this JSON will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
 When the DTNLink finds a new node (either through a Beacon or a snooped message), it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks (RLs).
 
-As we are exclusively using RLs, we are *guaranteed* to get a notification about the result of the delivery. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding PDU file is deleted along with it. If the agent receives a notification about delivery failure, <what will it do?>
+As we are exclusively using RLs, we are *guaranteed* to get a notification about the result of the delivery. It will continue to listen for notifications for the delivery status of the PDUs. If the agent is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding PDU file is deleted along with it. If the DTNLink receives a notification about delivery failure, it does not do anything for the time being.
 
 **Edge Case:** If the receiving node is out of buffer space, we can lose a message entirely! The receiving node will not be able to store the message due to insufficient buffer space, but the RL will report successful delivery, causing the sending node to delete the message from its buffer. This might be addressed in the future if it becomes a significant problem.
 
@@ -160,13 +160,17 @@ The DTNLink is a UnetAgent which contains instances of the above classes. The DT
 
 The DTNLink will support the Link service. This implicitly means it will have to support the Datagram service as well. However, it will not support the Reliability capability as there is no guarantee that we will receive the notification of a successful delivery. The Agent can only provide delivery notifications on a best effort basis to Datagrams which have Reliability set to null. Datagrams which require Reliability will be refused.
 
-This DTNLink will receive Datagrams from the Router. This means the DTNLink will not be responsible for routing messages for the time being. It will also receive messages from Reliable links which need to be passed up to the router. The below block diagram illustrates this:
+This DTNLink will receive Datagrams from the Router. This means the DTNLink will not be responsible for routing messages for the time being. It will also receive messages from Reliable links which need to be passed up to the router.
 
-![](DTNAgent.png)
+For now, we trust the Link to take care of notifications and the resending of payloads. The DTNLink will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first Link supporting reliability we can find.
 
-(Yellow == DatagramNtf, Purple == DatagramReq)
+**Short circuit transmissions:** In the case of single-hop messages, we do not need to send any metadata along with the DatagramReq, for the message is sent straight to the App on receiving the DatagramNtf from the RL. Therefore, we do not have to encode the data in a PDU - we can just resend the DatagramReq which we receive from the App.
 
-For now, we trust the Link to take care of notifications and the resending of payloads. The DTNLink will subscribe to these topics to mark PDUs ready for deletion. At the moment, we will only choose to send messages on the first ReliableLink we can find.
+A multi-hop message on the penultimate node in its route will be treated as a single-hop message by that node and will be subject to the single-hop short circuit treatment.
+
+**Multi-hop transmissions:** Multi-hop messages will need to *at least* maintain the metadata about the TTL of the message so it can be tracked on each node in the network. For this, we will have to encode the data from the DatagramReq sent by the App in a PDU.
+
+However, the DTNLink only supports the Link service for now, which means that Reliability can only be ensured for a single hop. This means that only the penultimate node gets the DDN message which can be used for deleting a delivered message. Other nodes do not delete the message right away as the DDN they receive only mean that the message has gone to the next off. The other nodes must wait for the message TTL to expire before deleting it.
 
 **NOTE:** We only advertise success immediately, not failure! This is because a failed message at one instant may succeed later. On a message which has expired, we just send a DFN on DTNLink's topic.
 
@@ -337,6 +341,7 @@ class DTNLink extends UnetAgent {
 * DuplicateNtfs from listening to both RxFrameNtfs/DatagramNtfs on phy/link
 * How to pass TTLs for multi-hop?
 * Why would i need fillers in my PDUs?
+* How do I identify which messages are multi-hop?
 
 ## Check
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
