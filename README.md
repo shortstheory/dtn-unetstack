@@ -269,6 +269,7 @@ class DTNLink extends UnetAgent {
         }
     }
 
+    // get message from above
     Message processRequest(Message msg) {
         switch (msg) {
         case DatagramReq:
@@ -289,6 +290,7 @@ class DTNLink extends UnetAgent {
         return link.getMTU-12;
     }
 
+    // receipt of different messages
     void processMessage(Message msg) {
         switch (msg) {
         case RxFrameNtf:
@@ -297,11 +299,15 @@ class DTNLink extends UnetAgent {
                 // start sending messages residing in the SCAF to it
                 def msgs = getMsgsForNextHop(addr);
                 for (def msg : msgs) {
-                    def bytes = deserializeJSON(msg.id);
-                    def data = dtnPdu.decode(bytes);
-                    // reduce the TTL
-                    data.ttl = msg.expiryTime - currentTime;
-                    reliableLink.send(new DatagramReq(to: msg.to, data: pdu.encode(data)));
+                    if (shortCircuit) {
+                        // we can drop ttl since we know the next node won't use it
+                        def data = dtnPdu.decode(bytes)
+                        reliableLink.send(new DatagramReq(to: msg.to, data: data, protocol: dtnPdu.protocol))
+                    } else {
+                        def data = dtnPdu.decode(bytes);
+                        data.ttl = msg.expiryTime - currentTime;
+                        reliableLink.send(new DatagramReq(to: msg.to, data: pdu.encode(data), protocol: DTN_PROTOCOL));
+                    }
                 }
             }
             break;
