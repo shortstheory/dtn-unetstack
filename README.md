@@ -43,7 +43,7 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 ![](UNETSTACK-DTN.png)
 
-### Classes
+### Components
 
 #### Beacon
 
@@ -346,6 +346,10 @@ class DTNLink extends UnetAgent {
     }
 };
 ```
+
+## Simulations
+
+TBA
 
 ## Open Issues
 * What kind of simulations can I create?
