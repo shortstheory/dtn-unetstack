@@ -336,7 +336,7 @@ class DTNLink extends UnetAgent {
             notify.send(createNtf(dtnMsg, SUCCESS));
             break;
         case DatagramFailureNtf:
-            // we don't need to do anything,
+            // we don't need to do anything
             def pduId = storage.datagramMap.get(s);
             def dtnMsg = storage.getDtnMetadata(pduId);
             storage.deleteMsg(pduId);
@@ -348,6 +348,7 @@ class DTNLink extends UnetAgent {
 ```
 
 ## Open Issues
+* What kind of simulations can I create?
 * What do we do when link.phy is not exposed?
 * Do we need a fixed-length PDU?
     * output pdu looks unstructured? But worth it for variable length
@@ -358,6 +359,7 @@ class DTNLink extends UnetAgent {
 * DatagramNtfs need TTLs
 * DuplicateNtfs from listening to both RxFrameNtfs/DatagramNtfs on phy/link
 * Why would i need fillers in my PDUs?
+* IntelliJ mostly works, but doesn't log or identify active agents properly?!
 
 ## Check
 * How to pass TTLs for multi-hop? - Unet API changes
