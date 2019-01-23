@@ -333,7 +333,11 @@ class DTNLink extends UnetAgent {
             def pduId = storage.datagramMap.get(s); // change this to a proper getter
             def dtnMsg = storage.getDtnMetadata(pduId);
             storage.deleteMsg(pduId);
-            notify.send(createNtf(dtnMsg, SUCCESS));
+            
+            // in MH routes, we can't send a DDN to app
+            if (shortCircuit) {
+                notify.send(createNtf(dtnMsg, SUCCESS));
+            }
             break;
         case DatagramFailureNtf:
             // we don't need to do anything
@@ -352,6 +356,9 @@ class DTNLink extends UnetAgent {
 TBA
 
 ## Open Issues
+* Do we send a DDN to the app in multihop, or only in the case of short-circuit?
+* DatagramNtfs need TTLs
+    * And the Routers re-routing those DNtfs need to have the logic to preserve the TTL for the DatagramReq they send out
 * What kind of simulations can I create?
 * What do we do when link.phy is not exposed?
 * Do we need a fixed-length PDU?
@@ -360,7 +367,6 @@ TBA
 * A param will be true for all the messages sent to the DTNLink
     * what if I only want some messages to be SC'ed?
 * DTNL can be bypassed entirely in short-circuit
-* DatagramNtfs need TTLs
 * DuplicateNtfs from listening to both RxFrameNtfs/DatagramNtfs on phy/link
 * Why would i need fillers in my PDUs?
 * IntelliJ mostly works, but doesn't log or identify active agents properly?!
