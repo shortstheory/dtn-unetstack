@@ -187,6 +187,10 @@ However, the DTNLink only supports the Link service for now, which means that Re
 class DTNLink extends UnetAgent {
     // These can inner classes / part of the same pkg
     DtnStorage storage;
+    int addr;
+    long linkLastSeen;
+
+    boolean shortCircuit;
 
     AgentID link;
     AgentID router;
@@ -195,32 +199,22 @@ class DTNLink extends UnetAgent {
 
     TickerBehavior beacon;
     TickerBehavior sweepStorage;
-    int addr;
-    long linkLastSeen;
     final int BEACON_DURATION = 100000; // should this be a param?
     final int STORAGE_DURATION = 100000;
 
     void setup() {
         register Services.LINK
         register Services.DATAGRAM
-        // as we rely on RL's, we can advertise Reliability as well
+        // as we use only RL's, we can advertise Reliability as well
         addCapability DatagramCapability.RELIABILITY
     }
 
     void startup() {
-        storage = new DtnStorage(this, STORAGE_DURATION);
-
         // I'm not really sure if this is required
-        phy = agentForService Services.PHYSICAL
         nodeInfo = agentForService Services.NODE_INFO
         router = agentForService Services.ROUTING
 
-        subscribe(phy)
-        subscribe(topic(phy, Physical.SNOOP))
-
-
         notify = topic()
-
 
         addr = get(nodeInfo, NodeInfoParam.address)
 
@@ -263,9 +257,14 @@ class DTNLink extends UnetAgent {
             if (rsp.getPerformative() == Performative.CONFIRM) {
                 // NOTE: need to subscribe to the PHY for each link as well!
                 subscribe(l);
-                // subscribe(phy-for-this-link)
-                link = l;
-                break;
+                if (l.phy != null) {
+                    link = l;
+                    subscribe(link.phy)
+                    subscribe(topic(link.phy, Physical.SNOOP))
+                    break;
+                } else {
+                    ???
+                }
             }
         }
     }
@@ -283,13 +282,15 @@ class DTNLink extends UnetAgent {
         }
     }
 
+    bool getShortCircuit();
+    void setShortCircuit(bool enable);
+
     int getMTU() {
-        return link.getMTU-8;
+        return link.getMTU-12;
     }
 
     void processMessage(Message msg) {
         switch (msg) {
-            // do we need a protocol number
         case RxFrameNtf:
             if (msg.to != addr) {
                 // now we know this node is alive!
@@ -323,19 +324,15 @@ class DTNLink extends UnetAgent {
             break;
         case DatagramDeliveryNtf:
             // how do we get the message to which it is mapped? -> inReplyTo
-            // the problem is that we are resending the datagram.
-            // so this DDN may not make sense to any subscriber
             def pduId = storage.datagramMap.get(s); // change this to a proper getter
-            def dtnMsg = storage.getDtnMsg(pduId);
+            def dtnMsg = storage.getDtnMetadata(pduId);
             storage.deleteMsg(pduId);
             notify.send(createNtf(dtnMsg, SUCCESS));
             break;
         case DatagramFailureNtf:
             // we don't need to do anything,
-            // but again, which Dgram/might need to manually map this
-            // is it mapped to?
-            def pduId = storage.datagramMap.get(s); // change this to a proper getter
-            def dtnMsg = storage.getDtnMsg(pduId);
+            def pduId = storage.datagramMap.get(s);
+            def dtnMsg = storage.getDtnMetadata(pduId);
             storage.deleteMsg(pduId);
             notify.send(createNtf(dtnMsg, FAILURE));
             break;
@@ -345,6 +342,7 @@ class DTNLink extends UnetAgent {
 ```
 
 ## Open Issues
+* What do we do when link.phy is not exposed?
 * Do we need a fixed-length PDU?
     * output pdu looks unstructured? But worth it for variable length
 * Original protocol number must be embedded in the PDU
