@@ -27,7 +27,7 @@ We are relaxing some of the requirements for DTNs for the first iteration of thi
 * A **Beacon**, to allow nodes to advertise their existence and find other nodes.
 * A **Storage** mechanism to allow for SCAF. This should also delete files which have been successfully acknowledged or those which have expired TTLs.
 * A **PDU** (which will be wrapped in the DatagramReq) for storing DTN metadata such as TTL.
-* A **DTNLink** (DTN Agent) which can handle Datagram requests from other agents and send essential notifications about the relay of PDUs.
+* A **DTNLink** which can handle Datagram requests from other agents and send essential notifications about the relay of PDUs. As this is a Link, it can guarantee single-hop Reliability, but does not yet provide Reliability for multiple hops as the Transport service would.
 
 Goals which will not be covered by the first iteration but which may be covered in the future are:
 
@@ -47,7 +47,7 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 #### Beacon
 
-The Beacon is a part of the DTNLink. It is a WakerBehavior, whose task is to periodically send a message to advertise the existence of a node to all neighbors by sending an empty DatagramReq on the Link with on the Unet broadcast address.
+The Beacon is a part of the DTNLink. It is a TickerBehavior, whose task is to periodically send a message to advertise the existence of a node to all neighbors by sending an empty DatagramReq on the Link with on the Unet broadcast address.
 
 Beacons are not explicitly required to advertise the existence of links. The DTNLink will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link for that interval.
 
@@ -74,7 +74,8 @@ class DtnPDU extends PDU {
 
     void format() {
         length(pduLength);
-        uint8("type");
+    //  all PDUs are only for sending data, so we don't need the type field for now
+    //  uint8("type");
         uint32("id");
         uint32("ttl");
         char("data", pduLength-8);
@@ -109,6 +110,11 @@ class DtnMsg {
 };
 
 class DtnStorage {
+    // we could maybe get away with just serialising
+    // and storing this for the time being
+    // but frequent IO on each DReq is probably not
+    // such a good idea
+
     // db is PduID and DtnMsg
     HashMap<long, DtnMsg> db;
     // datagramMap maps the New (resent) DR messageID to PduID
@@ -196,6 +202,7 @@ class DTNLink extends UnetAgent {
     void setup() {
         register Services.LINK
         register Services.DATAGRAM
+        addCapability DatagramCapability.RELIABILITY
     }
 
     void startup() {
@@ -208,14 +215,14 @@ class DTNLink extends UnetAgent {
 
         subscribe(phy)
         subscribe(topic(phy, Physical.SNOOP))
+
+
         notify = topic()
+
 
         addr = get(nodeInfo, NodeInfoParam.address)
 
-        // should this be made a function?
-        add new OneShotBehavior({
-            getReliableLink();
-        })
+        getReliableLink();
 
         beacon = add new TickerBehavior(BEACON_DURATION, {
             if (currentTime - linkLastSeen >= BEACON_DURATION) {
@@ -338,10 +345,11 @@ class DTNLink extends UnetAgent {
 ```
 
 ## Open Issues
+* DatagramNtfs need TTLs
 * DuplicateNtfs from listening to both RxFrameNtfs/DatagramNtfs on phy/link
 * How to pass TTLs for multi-hop?
-* Why would i need fillers in my PDUs?
 * How do I identify which messages are multi-hop?
+* Why would i need fillers in my PDUs?
 
 ## Check
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
