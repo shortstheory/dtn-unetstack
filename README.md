@@ -31,7 +31,7 @@ We are relaxing some of the requirements for DTNs for the first iteration of thi
 
 Goals which will not be covered by the first iteration but which may be covered in the future are:
 
-* Dedicated ACK schemes. Though this is very important in DTNs, we are only focussing on single hop routing and we only need to make sure our message has reached the next hop node. This will be covered by using ReliableLinks for single hops.
+* Dedicated ACK schemes. Though this is very important in DTNs, we are only focussing on single hop routing and we only need to make sure our message has reached the next hop node. This will be covered by using Links with Reliability for single hops.
 * The DTNLink should be able to talk over multiple ReliableLinks and should have the capability of choosing the best Link for a certain application.
 * Multihop routing of PDUs.
 * Dynamic routing protocols.
@@ -39,9 +39,9 @@ Goals which will not be covered by the first iteration but which may be covered 
 * Multiple copies of PDUs.
 * Optimally ordering/prioritizing PDUs for relays between nodes.
 
-### Flowchart
+### Sequence Diagrams
 
-![](UNETSTACK-DTN.png)
+Refer to the PDFs for the same.
 
 ### Components
 
@@ -49,7 +49,7 @@ Goals which will not be covered by the first iteration but which may be covered 
 
 The Beacon is a part of the DTNLink. It is a TickerBehavior, whose task is to periodically send a message to advertise the existence of a node to all neighbors by sending an empty DatagramReq on the Link with on the Unet broadcast address.
 
-Beacons are not explicitly required to advertise the existence of links. The DTNLink will snoop for packets sent on all Reliable links connected to it. If we detect a transmission during the beacon interval, then there is no need to send a Beacon on that Link for that interval.
+Beacons are not explicitly required to advertise the existence of links. The DTNLink will snoop for packets sent on all Reliable links connected to it. If we detect sending a message on that Link during the beacon interval, then there is no need to send a Beacon on that Link for that interval.
 
 #### DtnPdu
 
@@ -356,14 +356,18 @@ class DTNLink extends UnetAgent {
 TBA
 
 ## Open Issues
+* We will lose DTNLink metadata on passing it up!
+* Is the USB hop considered to be a link?
 * Do we send a DDN to the app in multihop, or only in the case of short-circuit?
 * DatagramNtfs need TTLs
     * And the Routers re-routing those DNtfs need to have the logic to preserve the TTL for the DatagramReq they send out
 * What kind of simulations can I create?
+    * What values of Datagram size, beacon interval, storage space should I use?
 * What do we do when link.phy is not exposed?
 * Do we need a fixed-length PDU?
     * output pdu looks unstructured? But worth it for variable length
 * Original protocol number must be embedded in the PDU
+* What does logs/trace.nam do?
 * A param will be true for all the messages sent to the DTNLink
     * what if I only want some messages to be SC'ed?
 * DTNL can be bypassed entirely in short-circuit
