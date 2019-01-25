@@ -77,15 +77,29 @@ def DtnPDU = PDU.withFormat() {
 
 The DtnStorage class will handle the SCAF mechanism. It will track PDUs, manage storage on the node and will delete expired PDUs.
 
-Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, and the Expiry Time based on the node's own clock. This database will be stored on the persistent storage.
-
-Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time. One disadvantage of this approach is that the in-memory DB could be affected by power failure. To fix this, we will back the DB on the filesystem.
-
 The PDUs themselves will be serialized to bytes for storage on the node. The filename of this will be the PDU ID. This will make it easier to manage the files with relation to the database entries. All the serialized PDUs will be kept in a separate directory on each node.
 
 When the DTNLink finds a new node (either through a Beacon or a snooped message), it will query the database/data structure for the PDUs destined for the node. Once this is done, the TTLs are checked for expiry. The agent will then send the PDU over one of the ReliableLinks (RLs).
 
 As we are exclusively using RLs, we are *guaranteed* to get a notification about the result of the delivery. It will continue to listen for notifications for the delivery status of the PDUs. If the DTNLink is notified of a successful transmission, the entry is deleted from the database/data structure and the corresponding PDU file is deleted along with it. If the DTNLink receives a notification about delivery failure, it does not do anything for the time being.
+
+```
+File name - PDU ID
+Contents - Serialized PDU to bytes
+```
+
+```
+In-memory Data-structures
+
+DB - <PDU ID, <Next Hop, Expiry Time, Original MessageID>>
+MessageTracker - <New MessageID, PDU ID>
+
+These can be serialized and stored on internal memory.
+```
+
+**Storage Format:** Each PDU contains a TTL which specifies the time until its expiry. DtnStorage can implement this by having an Sqlite3 database with three columns: PDU ID (Primary Key), Next Hop, and the Expiry Time based on the node's own clock. This database will be stored on the persistent storage.
+
+Alternatively, we can use a HashMap, keyed by the Next Hop node. The value of the key, will have a set of tuples of the PDU ID and Expiry Time. One disadvantage of this approach is that the in-memory DB could be affected by power failure. To fix this, we will back the DB on the filesystem.
 
 **Edge Case:** If the receiving node is out of buffer space, we can lose a message entirely! The receiving node will not be able to store the message due to insufficient buffer space, but the RL will report successful delivery, causing the sending node to delete the message from its buffer. This might be addressed in the future if it becomes a significant problem.
 
@@ -168,6 +182,40 @@ However, the DTNLink only supports the Link service for now, which means that Re
 **NOTE:** We only advertise success immediately, not failure! This is because a failed message at one instant may succeed later. On a message which has expired, we just send a DFN on DTNLink's topic.
 
 **Future work:** If a Datagram cannot be sent on a given link, the Agent will try sending it on the other links until 1) the message is transferred successfully 2) the Beacon message from the receiving node is no longer received 3) all the other options for ReliableLinks have been exhausted. In case 3) it might be beneficial to resend the message at exponentially increasing intervals, or as future work, transfer custody of the message to another node.
+
+#### Events
+
+```
+On getting DR from above:
+* Generate PDU with nonce 
+* Extract original DR message ID, next hop, and expiry time; insert into DB
+* Write PDU to internal storage
+
+On seeing a node
+* Get list of PDUs for node - O(N)
+* Read PDU from storage
+* If S/C
+    * decode PDU
+* Generate new DR, adjust protocol # based on S/C or not
+* Send DR on best RL
+
+On DDN:
+* Get inreplyto from DDN
+* Get PDU ID by querying MessageTracker - O(1)
+* Delete:
+    * file
+    * DB entry
+    * MessageTracker entry
+
+On DFN:
+* do nothing
+
+On TTL expiry:
+* find entry with this PDU ID in MessageTracker - O(N)
+* follow same steps as on DDN
+```
+
+#### Pseudo Code
 
 ```
 class DTNLink extends UnetAgent {
