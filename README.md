@@ -62,29 +62,15 @@ The ID is a nonce for uniquely identifying each PDU for tracking purposes. It is
 **NOTE:** for multi-hop support, DtnPDU can be extended to have separate types such as success/failure PDU. This will only be usable once we move to DtnTransport.
 
 ```
-class DtnPDU extends PDU {
-    int pduLength; // FIXME: does this get added to the size of the PDU?
-
-    // do we need these fields?
-    // final int DATA_PDU = 0x01;
-    // final int SUCCESS_PDU = 0x02;
-    // final int FAILURE_PDU = 0x03;
-
-    DtnPDU(int length) {
-        pduLength = length;
-    }
-
-    void format() {
-        length(pduLength);
-    //  all PDUs are only for sending data, so we don't need the type field for now
-    //  uint8("type");
-        uint32("id");
-        uint32("ttl");
-        uint32("protocol");
-        char("data", pduLength-12);
-        padding(0xff); // do we really need padding?
-    }
-};
+def DtnPDU = PDU.withFormat() {
+//  all PDUs are only for sending data, so we don't need the type field for now
+//  uint8("type");
+    uint32("id");
+    uint32("ttl");
+    uint32("protocol");
+    char("data", pduLength-12);
+    padding(0xff); // do we really need padding?
+}
 ```
 
 #### DtnStorage
