@@ -401,7 +401,6 @@ TBA
 * Do we need a fixed-length PDU?
     * output pdu looks unstructured? But worth it for variable length
 * Original protocol number must be embedded in the PDU
-* What does logs/trace.nam do?
 * A param will be true for all the messages sent to the DTNLink
     * what if I only want some messages to be SC'ed?
 * DTNL can be bypassed entirely in short-circuit
@@ -417,6 +416,7 @@ TBA
 * Is a TTL'ed message the same as a failed message and worth informing the other node about? Ideally even failed messages should go back up to router?
 * What is the difference between calling a fxn and using a 1-shot behavior? - 1 shot can be scheduled in async
 * How do I run groovy in my IDE?
+* What does logs/trace.nam do?
 * Why do DDN's/DFN's have "to:" set to the sending node?
 * What should agents do on listening to the Ntfs and what action should they take?
 * OutputPDUs also have a length field which must be filled
