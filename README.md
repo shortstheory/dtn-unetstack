@@ -161,6 +161,37 @@ class DtnStorage {
 };
 ```
 
+#### USBLink
+
+The USBLink will allow a node to store files on an external device. It will support the Link and Datagram Reliability.
+
+A basic outline for such a Link is given below:
+
+
+**NOTE:** 
+* Sending Beacon messages will cause a lot of spurious messages to be stored on the device!!
+* What will phy be set to for USBLink?
+
+```
+params:
+    directory
+    format - JSON/XML
+
+startup:
+    poll for USB devices?
+    send a ntf on our topic once we discover one
+
+processRequest:
+    if DatagramReq
+        save in storage with protocol number
+        if success
+            send DDN
+        else
+            send DFN
+```
+
+Such hops are strictly single hop. There is no need to encode DTNLink PDU information for such a link.
+
 #### DTNLink
 
 The DTNLink is a UnetAgent which contains instances of the above classes. The DTNLink will handle the sending of messages, sending and receiving of notifications, and logic for selecting the ReliableLink to be used.

@@ -1,3 +1,7 @@
+Router PDU:
+Object req2 = var2[74].callConstructor(DatagramReq.class, ScriptBytecodeAdapter.createMap(new Object[]{"recipient", var2[75].callGetProperty(r), "to", var2[76].callGetProperty(r), "data", pdu, "reliability", var2[77].callGetProperty(r), "protocol", PROTOCOL}));
+
+
 phy = agentForService Services.PHYSICAL
 phy << new TxFrameReq()
 
