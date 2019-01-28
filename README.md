@@ -94,6 +94,11 @@ In-memory Data-structures
 DB - <PDU ID, <Next Hop, Expiry Time, Original MessageID>>
 MessageTracker - <New MessageID, PDU ID>
 
+ALTERNATIVELY
+
+DB - <Original MessageID <Next Hop, Expiry Time>>
+MessageTracker <New MessageID, Original MessageID>
+
 These can be serialized and stored on internal memory.
 ```
 
@@ -171,6 +176,7 @@ A basic outline for such a Link is given below:
 **NOTE:** 
 * Sending Beacon messages will cause a lot of spurious messages to be stored on the device!!
 * What will phy be set to for USBLink?
+* How can I make it generic? USBLink discovery messages
 
 ```
 params:
@@ -178,7 +184,7 @@ params:
     format - JSON/XML
 
 startup:
-    poll for USB devices?
+    poll for USB devices by listening observing /dev/sd*?
     send a ntf on our topic once we discover one
 
 processRequest:
@@ -205,6 +211,8 @@ For now, we trust the Link to take care of notifications and the resending of pa
 **Short circuit forwarding:** In the case of single-hop messages, we do not need to send any metadata along with the DatagramReq, for the message is sent straight to the App on receiving the DatagramNtf from the RL. Therefore, we do not have to encode the data in a PDU - we can just resend the DatagramReq which we receive from the App. The DtnPduMetadata has the fields which we need for populating a new DatagramReq for forwarding. We keep the protocol number of the original DatagramReq so it's acted upon directly by the App, bypassing the receiver's DTNLink entirely.
 
 **NOTE:** Once we can pre-emptively figure out whether a message is on a multi-hop or a single-hop path, a multi-hop message on the penultimate node in its route will be treated as a single-hop message by that node and will be subject to the single-hop short circuit treatment.
+
+**NOTE2:** We can identify Router PDU in DTNL to check if it is via multihop.
 
 **Multi-hop transmissions:** Multi-hop messages will need to *at least* maintain the metadata about the TTL of the message so it can be tracked on each node in the network. For this, we will have to encode the data from the DatagramReq sent by the App in a PDU.
 
@@ -421,6 +429,10 @@ class DTNLink extends UnetAgent {
 TBA
 
 ## Open Issues
+* USB Link
+* Link availability
+* getting message sent on link
+
 * We will lose DTNLink metadata on passing it up!
 * Is the USB hop considered to be a link?
 * Do we send a DDN to the app in multihop, or only in the case of short-circuit?
