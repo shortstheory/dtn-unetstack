@@ -432,15 +432,15 @@ TBA
 * USB Link
 * Link availability
 * getting message sent on link
-
+* Show intellij
+* What do we do when link.phy is not exposed?
+* What kind of simulations can I create?
+    * What values of Datagram size, beacon interval, storage space should I use?
 * We will lose DTNLink metadata on passing it up!
 * Is the USB hop considered to be a link?
 * Do we send a DDN to the app in multihop, or only in the case of short-circuit?
 * DatagramNtfs need TTLs
     * And the Routers re-routing those DNtfs need to have the logic to preserve the TTL for the DatagramReq they send out
-* What kind of simulations can I create?
-    * What values of Datagram size, beacon interval, storage space should I use?
-* What do we do when link.phy is not exposed?
 * Do we need a fixed-length PDU?
     * output pdu looks unstructured? But worth it for variable length
 * Original protocol number must be embedded in the PDU
